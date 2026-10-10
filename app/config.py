@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_core import MultiHostUrl
-from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -11,6 +10,9 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = 'localhost'
     POSTGRES_PORT: int = 5433
     POSTGRES_DB: str = "shift_calendary_db"
+
+    JWT_SECRET_KEY: str = "123456789"
+    JWT_ALGORITHM:str = "HS256"
 
     model_config = SettingsConfigDict(
         env_file=".env", 
