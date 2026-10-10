@@ -218,3 +218,64 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# ==========================================
+# macOS (OS X) System Files
+# ==========================================
+.DS_Store
+.localized
+.AppleDouble
+.LSOverride
+._*
+
+# Files that might be created on a Mac volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potential created on remote AFP shares
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# ==========================================
+# Windows System Files
+# ==========================================
+# Windows image thumbnails
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows shortcut files
+*.lnk
+
+# ==========================================
+# Linux System Files
+# ==========================================
+# Temporary files for deleted open files
+*~
+.fuse_hidden*
+
+# Linux trash folders
+.Trash-*
+
+# KDE directory preferences
+.directory
+
+# Network File System open file remnants
+.nfs*
+
