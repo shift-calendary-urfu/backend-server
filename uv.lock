@@ -86,6 +86,7 @@ dependencies = [
     { name = "pwdlib" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
+    { name = "python-multipart" },
     { name = "sqlalchemy" },
 ]
 
@@ -99,6 +100,7 @@ requires-dist = [
     { name = "pwdlib", specifier = ">=0.3.1" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "pyjwt", specifier = ">=2.15.1" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "sqlalchemy", specifier = ">=2.1.4" },
 ]
 
