@@ -22,7 +22,8 @@
 | `first_name` | String(100) | ✅ | — | — | — | Имя пользователя |
 | `second_name` | String(100) | ✅ | — | — | — | Фамилия пользователя |
 | `third_name` | String(100) | ❌ | `NULL` | — | — | Отчество. Опционально, т.к. не у всех есть |
-| `phone` | String(20) | ❌ | `NULL` | — | — | Телефон для связи. Можно добавить позже |
+| `phone` | String(20) | ✅ | - | ✅ | — | Телефон для связи. Можно добавить позже |
+| `is_phone_verified` | Boolean | ✅ | `False` | — | — | Подтверждён ли телефон (для будущего SMS) |
 | `created_at` | DateTime | ✅ | `now()` | — | — | Дата регистрации |
 | `updated_at` | DateTime | ✅ | `now()` | — | — | Дата последнего обновления (auto-update) |
 
@@ -43,7 +44,9 @@
 | `address` | String(500) | ❌ | `NULL` | — | — | Адрес. Опционально на старте |
 | `phone` | String(20) | ❌ | `NULL` | — | — | Контактный телефон точки |
 | `description` | Text | ❌ | `NULL` | — | — | Описание точки |
-| `workplace_type` | String(50) | ✅ | — | — | — | Тип точки: `pvz`, `shop`, `barbershop`, `car_wash`, `other` |
+| `workplace_type` | String(50) | ✅ | — | — | — | Тип точки: `WB`, `Ozon`, `Yandex_market`, `other` |
+| `work_start_time` | Time | ✅ | — | — | — | Начало рабочего дня |
+| `work_end_time` | Time | ✅ | — | — | — | Конец рабочего дня |
 | `owner_id` | Integer (FK → `users.id`) | ✅ | — | — | ✅ | Владелец точки. **Связь many-to-one** с `User` |
 | `created_at` | DateTime | ✅ | `now()` | — | — | Дата создания |
 | `updated_at` | DateTime | ✅ | `now()` | — | — | Дата обновления |
