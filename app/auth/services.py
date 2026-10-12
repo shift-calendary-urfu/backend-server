@@ -16,7 +16,7 @@ class AuthServices:
         self.db = db
         self.auth_manager = AuthTokensManager(db=db)
 
-    async def register_user(
+    async def create_user(
         self,
         user: UserCreate,
     ) -> UserModel:
@@ -44,7 +44,7 @@ class AuthServices:
         return db_user
 
 
-    async def authenticate_user(
+    async def get_authenticated_user(
         self,
         form_data: OAuth2PasswordRequestForm
     ):
@@ -70,7 +70,7 @@ class AuthServices:
         refresh_token = self.auth_manager.create_refresh_token(
             data={'sub':user.email, 'id': user.id}
         )
-        
+
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
     
