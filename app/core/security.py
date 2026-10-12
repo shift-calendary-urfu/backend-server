@@ -13,6 +13,7 @@ from enum import Enum
 from app.users.model import User as UserModel
 from app.auth.schemas import RefreshTokenRequest
 from app.config import settings
+from app.exceptions import InvalidRefreshTokenException
 
 import jwt
 
@@ -56,7 +57,7 @@ class AuthTokensManager:
         self.REFRESH_TOKEN_EXPIRE_DAYS = 7
 
         # Схема для проверки Bearer Tokens
-        self.oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+        self.oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
     def create_access_token(self, data: dict) -> str:
         """
@@ -122,14 +123,14 @@ class AuthTokensManager:
             email: str | None = payload.get("sub")
             token_type: str | None = payload.get("token_type")
             if email is None or token_type != TokenType.REFRESH.value:
-                raise credentials_exception
+                raise InvalidRefreshTokenException("Could not validate refresh token")
 
         except jwt.ExpiredSignatureError:
             # refresh-токен истёк
-            raise credentials_exception
+            raise InvalidRefreshTokenException("Could not validate refresh token")
         except jwt.PyJWTError:
             # подпись неверна или токен повреждён
-            raise credentials_exception
+            raise InvalidRefreshTokenException("Could not validate refresh token")
         
         user = await self.db.scalar(
             select(UserModel).where(
@@ -138,7 +139,7 @@ class AuthTokensManager:
             )
         )
         if user is None:
-            raise credentials_exception
+            raise InvalidRefreshTokenException("Could not validate refresh token")
 
         new_refresh_token = self.create_refresh_token(
             data={"sub": user.email, "id": user.id}
