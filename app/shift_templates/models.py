@@ -16,6 +16,9 @@ class ShiftTemplate(Base):
     cycle_start_date: Mapped[date] = mapped_column(Date, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    workplace: Mapped["Workplace"] = relationship("Workplace", back_populates="shift_templates")
+    employee: Mapped["Employee"] = relationship("Employee", back_populates="shift_templates")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
