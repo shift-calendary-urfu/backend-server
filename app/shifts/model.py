@@ -23,6 +23,9 @@ class Shift(Base):
     status: Mapped[str] = mapped_column(String(20), default="planned", nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    workplace: Mapped["Workplace"] = relationship("Workplace", back_populates="shifts")
+    employee: Mapped["Employee"] = relationship("Employee", back_populates="shifts")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

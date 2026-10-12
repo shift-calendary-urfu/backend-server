@@ -18,6 +18,11 @@ class Workplace(Base):
     work_end_time: Mapped[time] = mapped_column(Time, nullable=False)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
 
+    user: Mapped["User"] = relationship("User", back_populates="workplaces")
+    employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="workplace")
+    shifts: Mapped[list["Shift"]] = relationship("Shift", back_populates="workplace")
+    shift_templates: Mapped[list["ShiftTemplate"]] = relationship("ShiftTemplate", back_populates="workplace")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

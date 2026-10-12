@@ -25,6 +25,11 @@ class Employee(Base):
     hire_date: Mapped[date | None] = mapped_column(Date, nullable=True,)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    user: Mapped["User"] = relationship("User", back_populates="employees")
+    workplace: Mapped["Workplace"] = relationship("Workplace", back_populates="employees")
+    shifts: Mapped[list["Shift"]] = relationship("Shift", back_populates="employee")
+    shift_templates: Mapped[list["ShiftTemplate"]] = relationship("ShiftTemplate", back_populates="employee")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
