@@ -56,7 +56,7 @@ class AuthTokensManager:
         self.REFRESH_TOKEN_EXPIRE_DAYS = 7
 
         # Схема для проверки Bearer Tokens
-        self.oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+        self.oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
     def create_access_token(self, data: dict) -> str:
         """
