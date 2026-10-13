@@ -12,10 +12,14 @@ from enum import Enum
 
 from app.users.model import User as UserModel
 from app.auth.schemas import RefreshTokenRequest
+from app.core.database import get_db
 from app.config import settings
 from app.exceptions import InvalidRefreshTokenException
 
 import jwt
+
+# Схема для проверки Bearer Tokens
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 class TokenType(Enum):
@@ -56,8 +60,6 @@ class AuthTokensManager:
         self.ACCESS_TOKEN_EXPIRE_MINUTES = 30
         self.REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-        # Схема для проверки Bearer Tokens
-        self.oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
     def create_access_token(self, data: dict) -> str:
         """
@@ -106,12 +108,7 @@ class AuthTokensManager:
         """
         Обновляет access-token на основе старого refresh-tokена.
         """
-        
-        credentials_exception = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+
         old_refresh_token = body.refresh_token
         try:
 
@@ -150,61 +147,55 @@ class AuthTokensManager:
         return {
             "refresh_token": new_refresh_token,
             "access_token": new_access_token,
-            "token_type": "bearer",
+            "token_type": "Bearer",
         }
 
 
 # -------------------------------------------------------------
 
-
-class UserAuthManager:
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db), 
+) -> UserModel:
     """
-    Класс для управления аутентификацией пользователей.
+    Проверяет JWT и возвращает текущего пользователя из базы данных.
     """
-    def __init__(self, db: AsyncSession):
-        self.db = db
-        self.token = Depends(AuthTokensManager(db=db).oauth2_scheme)
+    credentials_exceptions = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail='Could not validate the provided credential',
+        headers={"WWW-Authenticate":"Bearer"},
+    )
 
-    async def get_current_user(self) -> UserModel:
-        """
-        Проверяет JWT и возвращает текущего пользователя из базы данных.
-        """
-        credentials_exceptions = HTTPException(
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY, 
+            algorithms=settings.JWT_ALGORITHM,
+        )
+
+        email: str | None = payload.get("sub")
+        token_type: str | None = payload.get("token_type")
+        if email is None or token_type != TokenType.ACCESS.value:
+            raise credentials_exceptions
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Could not validate the provided credential',
-            headers={"WWW-Authenticate":"Bearer"},
+            detail=f"Token expired",
+            headers={'WWW-Authenticate': 'Bearer'},
         )
+    
+    except jwt.PyJWTError:
+        raise credentials_exceptions
 
-        try:
-            payload = jwt.decode(
-                self.token,
-                settings.JWT_SECRET_KEY, 
-                algorithms=settings.JWT_ALGORITHM,
-            )
-
-            email: str | None = payload.get("sub")
-            token_type: str | None = payload.get("token_type")
-            if email is None or token_type != TokenType.ACCESS.value:
-                raise credentials_exceptions
-
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Token expired",
-                headers={'WWW-Authenticate': 'Bearer'},
-            )
-        
-        except jwt.PyJWTError:
-            raise credentials_exceptions
-
-        user = await self.db.scalar(
-            select(UserModel).where(
-                UserModel.email == email,
-                UserModel.is_active
-            )
+    user = await db.scalar(
+        select(UserModel).where(
+            UserModel.email == email,
+            UserModel.is_active
         )
-        if user is None:
-            raise credentials_exceptions
+    )
+    if user is None:
+        raise credentials_exceptions
 
-        return user
+    return user
     
