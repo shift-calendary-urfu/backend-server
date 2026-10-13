@@ -85,7 +85,7 @@ POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=my_database_name
 
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+CORS_ORIGINS=["http://localhost:3000","http://localhost:3001"]
 
 SECRET_KEY=123456789
 JWT_ALG=algorithm
