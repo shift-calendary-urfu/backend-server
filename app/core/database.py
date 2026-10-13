@@ -24,3 +24,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 class Base(DeclarativeBase):
     pass
+
+# ===== Import models here ======= 
+
+import app.users.model
+import app.employees.model
+import app.workplaces.model
+import app.shifts.model
+import app.shift_templates.models
