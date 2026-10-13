@@ -57,8 +57,8 @@ class UserServices:
             )
 
         if not verify_password(
-            new_password.get_secret_value(), 
-            old_passowrd_hash.get_secret_value()
+            old_passowrd_hash.get_secret_value(), 
+            user.hashed_password
         ):
             raise InvalidPasswordException(
                 "Current password is not matching."
@@ -70,7 +70,7 @@ class UserServices:
                    UserModel.email==user.email,
                    UserModel.is_active,
                    )
-            .values(password=hash_password(new_password.get_secret_value()))
+            .values(hashed_password=hash_password(new_password.get_secret_value()))
         )
         await self.db.commit()
         
