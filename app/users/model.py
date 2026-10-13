@@ -6,6 +6,16 @@ from datetime import datetime
 from app.core.database import Base
 
 
+# === type checking for SQLAlchemy models ===
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.workplaces.model import Workplace
+    from app.employees.model import Employee
+    
+# ===========================================
+
+
 class User(Base):
     __tablename__ = "users"
 

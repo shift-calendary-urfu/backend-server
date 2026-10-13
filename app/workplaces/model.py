@@ -5,6 +5,18 @@ from datetime import datetime, time
 from app.core.database import Base
 
 
+# === type checking for SQLAlchemy models ===
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.employees.model import Employee
+    from app.shifts.model import Shift
+    from app.shift_templates.models import ShiftTemplate
+    from app.users.model import User
+    
+# ===========================================
+
+
 class Workplace(Base):
     __tablename__ = "workplaces"
 
