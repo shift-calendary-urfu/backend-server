@@ -77,7 +77,7 @@ class AuthServices:
             data={'sub':user.email, 'id': user.id}
         )
 
-        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
 
 
     async def update_tokens(
