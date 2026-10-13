@@ -97,7 +97,7 @@ JWT_ALG=algorithm
 Перед этой главой установите себе `docker`
 
 ### Шаг 1: Запуск базы данных
-Запустите Docker Compose в фоновом режиме (флаг `-d`):
+Запустите Docker Compose в фоновом режиме (флаг `-d`), находясь на уровне с файлом docker:
 ```bash
 docker-compose up -d
 ```
