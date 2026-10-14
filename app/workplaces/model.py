@@ -22,7 +22,7 @@ class Workplace(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    address: Mapped[str] = mapped_column(String(500))
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     workplace_type: Mapped[str] = mapped_column(String(50), nullable=False)

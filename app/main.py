@@ -3,6 +3,7 @@ from fastapi import FastAPI
 
 from app.auth.router import router as auth_router
 from app.users.router import router as users_router
+from app.workplaces.router import router as workplaces_router
 
 from app.config import settings
 
@@ -38,6 +39,7 @@ app.add_middleware(
 # ----- Routes -----
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(workplaces_router)
 
 
 # ------------------
@@ -46,8 +48,8 @@ app.include_router(users_router)
 
 # ----- endpoint for health check -----
 @app.get(
-      "/",
-      tags=["Health Check"],
+    "/",
+    tags=["Health Check"],
 )
 async def root():
    return {"message": 'Hello World'}
