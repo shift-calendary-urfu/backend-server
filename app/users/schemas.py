@@ -6,7 +6,7 @@ from typing import Annotated
 class UserBase(BaseModel):
     first_name: Annotated[str, Field(description="Имя пользователя")]
     second_name: Annotated[str, Field(description="Фамилия пользователя")]
-    third_name: Annotated[str, Field(default=None, description="Отчество пользователя")]
+    third_name: Annotated[str | None, Field(default=None, description="Отчество пользователя")]
     email: Annotated[EmailStr, Field(description="Email пользователя")]
     phone: Annotated[str, Field(
         pattern=r'^(\+7\d{10}|8\d{10})$',
