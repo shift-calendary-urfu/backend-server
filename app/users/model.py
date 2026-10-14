@@ -29,6 +29,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="user")
+    # Рабочие точки созданные пользователем
     workplaces: Mapped[list["Workplace"]] = relationship("Workplace", back_populates="user")
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
