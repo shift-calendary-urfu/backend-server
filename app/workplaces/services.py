@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select, or_
 
 from app.users.model import User as UserModel
@@ -8,7 +9,7 @@ from app.workplaces.schemas import WorkplaceCreate
 
 from app.employees.model import Employee as EmployeeModel
 
-from app.exceptions import WorkplaceExistsException
+from app.exceptions import WorkplaceExistsException, WorkplaceNotFoundException
 
 
 class WorkplaceServices:
@@ -73,3 +74,24 @@ class WorkplaceServices:
         )
 
         return list(result.all())
+
+
+    async def get_by_id(
+        self,
+        workplace_id: int,
+    ):
+        result = await self.db.scalar(
+            select(WorkplaceModel)
+            .options(
+                selectinload(WorkplaceModel.employees)
+                .selectinload(EmployeeModel.user)
+            )
+            .where(WorkplaceModel.id == workplace_id)
+        )
+
+        if result is None:
+            raise WorkplaceNotFoundException(
+                "Workplace not found"
+            )
+
+        return result
