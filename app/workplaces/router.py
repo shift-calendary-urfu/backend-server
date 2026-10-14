@@ -3,16 +3,16 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.workplaces.model import Workplace as WorkplaceModel
-from app.workplaces.schemas import WorkplaceCreate, WorkplaceResponse
+from app.workplaces.schemas import WorkplaceCreate, WorkplaceResponse, WorkplaceWithEmployeesResponse
 from app.workplaces.services import WorkplaceServices
 
 from app.users.model import User as UserModel
 
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_owner_or_admin
 
-from app.exceptions import WorkplaceExistsException
+from app.exceptions import WorkplaceExistsException, WorkplaceNotFoundException
 
 
 router = APIRouter(
@@ -52,3 +52,21 @@ async def get_all_workspaces_for_user(
 ):
     services = WorkplaceServices(db)
     return await services.get_all_by_user(current_user)
+
+
+@router.get(
+    "/{workplace_id}",
+    response_model=WorkplaceWithEmployeesResponse)
+async def get_workplace_by_id(
+    workplace_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: UserModel = Depends(get_owner_or_admin),
+):
+    try:
+        services = WorkplaceServices(db)
+        return await services.get_by_id(workplace_id)
+    except WorkplaceNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
