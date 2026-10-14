@@ -31,7 +31,7 @@ class Employee(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     workplace_id: Mapped[int] = mapped_column(ForeignKey("workplaces.id"), nullable=False, index=True)
-    role_in_workplace: Mapped[str] = mapped_column(String(20), default="employee", nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="employee", nullable=False)
     position: Mapped[str | None] = mapped_column(String(100), nullable=True)
     hire_date: Mapped[date | None] = mapped_column(Date, nullable=True,)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

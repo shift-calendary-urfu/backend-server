@@ -24,11 +24,12 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String)
     first_name: Mapped[str] = mapped_column(String(255))
     second_name: Mapped[str] = mapped_column(String(255))
-    third_name: Mapped[str] = mapped_column(String(255))
+    third_name: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(12))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="user")
+    # Рабочие точки созданные пользователем
     workplaces: Mapped[list["Workplace"]] = relationship("Workplace", back_populates="user")
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
