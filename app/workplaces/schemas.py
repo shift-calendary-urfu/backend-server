@@ -6,7 +6,8 @@ from pydantic import (
     field_validator, 
     BeforeValidator, 
     PlainSerializer, 
-    ConfigDict
+    ConfigDict,
+    model_validator
 )
 
 from app.employees.schemas import EmployeeResponse
@@ -92,3 +93,56 @@ class WorkplaceWithEmployeesResponse(WorkplaceResponse):
     employees: Annotated[list[EmployeeResponse], Field(
         description="Список сотрудников рабочего пространства"
     )]
+
+
+class WorkplaceUpdate(BaseModel):
+    name: Annotated[str | None, Field(
+        None,
+        max_length=255, 
+        description="Название рабочего пространства"
+    )]
+    address: Annotated[str | None, Field(
+        None,
+        max_length=500, 
+        description="Адрес"
+    )]
+    phone: Annotated[str | None, Field(
+        None, 
+        max_length=20, 
+        description="Контактный телефон"
+    )]
+    description: Annotated[str | None, Field(
+        None, 
+        description="Описание"
+    )]
+    
+    workplace_type: Annotated[str | None, Field(
+        None,
+        max_length=50, 
+        description="Тип (например, 'ozon', 'wildberries', 'yandex_market', 'other')"
+    )]
+    
+    work_start_time: Annotated[TimeHHMM | None, Field(
+        None,
+        description="Время начала работы (HH:MM)", 
+        json_schema_extra={"type": "string", "format": "time", "example": "09:00"}
+    )]
+    work_end_time: Annotated[TimeHHMM | None, Field(
+        None,
+        description="Время окончания работы (HH:MM)", 
+        json_schema_extra={"type": "string", "format": "time", "example": "21:00"}
+    )]
+
+    @model_validator(mode='after')
+    def validate_work_times(self) -> 'WorkplaceUpdate':
+        start = self.work_start_time
+        end = self.work_end_time
+
+        if (start is None) != (end is None):
+            raise ValueError("Необходимо указать оба времени: и начала, и окончания работы (или не указывать ни одного)")
+
+        if start is not None and end is not None:
+            if end <= start:
+                raise ValueError("Время окончания работы должно быть строго позже времени начала")
+                
+        return self

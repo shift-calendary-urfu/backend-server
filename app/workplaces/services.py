@@ -1,11 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, update
 
 from app.users.model import User as UserModel
 
 from app.workplaces.model import Workplace as WorkplaceModel
-from app.workplaces.schemas import WorkplaceCreate
+from app.workplaces.schemas import WorkplaceCreate, WorkplaceUpdate
 
 from app.employees.model import Employee as EmployeeModel
 
@@ -93,5 +93,33 @@ class WorkplaceServices:
             raise WorkplaceNotFoundException(
                 "Workplace not found"
             )
+
+        return result
+
+
+    async def update_workplace(
+        self,
+        workplace_id: int,
+        workplace_data: WorkplaceUpdate,
+    ):
+        result = await self.db.scalar(
+            select(WorkplaceModel)
+            .where(WorkplaceModel.id == workplace_id)
+        )
+
+        if result is None:
+            raise WorkplaceNotFoundException(
+                "Workplace not found"
+            )
+
+        update_data = workplace_data.model_dump(exclude_unset=True)
+
+        await self.db.execute(
+            update(WorkplaceModel)
+            .where(WorkplaceModel.id == workplace_id)
+            .values(**update_data)
+        )
+
+        await self.db.commit()
 
         return result
