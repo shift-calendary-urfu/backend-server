@@ -10,9 +10,16 @@ from datetime import timedelta, datetime, timezone
 
 from enum import Enum
 
+from app.workplaces.model import Workplace as WorkplaceModel
+
+from app.employees.model import Employee as EmployeeModel
+
 from app.users.model import User as UserModel
+
 from app.auth.schemas import RefreshTokenRequest
+
 from app.core.database import get_db
+
 from app.config import settings
 from app.exceptions import InvalidRefreshTokenException
 
@@ -198,4 +205,36 @@ async def get_current_user(
         raise credentials_exceptions
 
     return user
-    
+
+
+async def get_owner_or_admin(
+    workplace_id: int,
+    user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserModel:
+    is_owner = await db.scalar(
+        select(WorkplaceModel.id).where(
+            WorkplaceModel.id == workplace_id,
+            WorkplaceModel.owner_id == user.id,
+        )
+    )
+
+    if is_owner is not None:
+        return user
+
+    is_admin = await db.scalar(
+        select(EmployeeModel.id).where(
+            EmployeeModel.workplace_id == workplace_id,
+            EmployeeModel.user_id == user.id,
+            EmployeeModel.role == "admin",
+            EmployeeModel.is_active,
+        )
+    )
+
+    if is_admin is not None:
+        return user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You must be the owner or admin of this workplace",
+    )
