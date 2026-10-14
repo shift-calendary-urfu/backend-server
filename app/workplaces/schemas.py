@@ -9,6 +9,8 @@ from pydantic import (
     ConfigDict
 )
 
+from app.employees.schemas import EmployeeResponse
+
 
 # Функция-валидатор для формата HH:MM
 def parse_hh_mm(v: Any) -> time:
@@ -84,3 +86,9 @@ class WorkplaceResponse(WorkplaceBase):
     )]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WorkplaceWithEmployeesResponse(WorkplaceResponse):
+    employees: Annotated[list[EmployeeResponse], Field(
+        description="Список сотрудников рабочего пространства"
+    )]
