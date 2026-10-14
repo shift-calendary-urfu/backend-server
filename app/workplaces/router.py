@@ -40,4 +40,15 @@ async def create_workplace(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=e.msg
         )
-    
+
+
+@router.get(
+    "/",
+    response_model=list[WorkplaceResponse]
+)
+async def get_all_workspaces_for_user(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    services = WorkplaceServices(db)
+    return await services.get_all_by_user(current_user)

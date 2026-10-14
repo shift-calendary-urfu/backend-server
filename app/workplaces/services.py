@@ -1,10 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from app.users.model import User as UserModel
 
 from app.workplaces.model import Workplace as WorkplaceModel
 from app.workplaces.schemas import WorkplaceCreate
+
+from app.employees.model import Employee as EmployeeModel
 
 from app.exceptions import WorkplaceExistsException
 
@@ -47,3 +49,27 @@ class WorkplaceServices:
         await self.db.commit()
 
         return new_workplace
+
+
+    async def get_all_by_user(
+        self,
+        user: UserModel,
+    ):
+        employee_workplaces = (
+        select(EmployeeModel.workplace_id)
+        .where(
+            EmployeeModel.user_id == user.id,
+            EmployeeModel.is_active,
+            )
+        )
+
+        result = await self.db.scalars(
+            select(WorkplaceModel).where(
+                or_(
+                    WorkplaceModel.owner_id == user.id,
+                    WorkplaceModel.id.in_(employee_workplaces),
+                )
+            )
+        )
+
+        return list(result.all())
