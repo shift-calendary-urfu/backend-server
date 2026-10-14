@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 from sqlalchemy import select, or_, update
 
 from app.users.model import User as UserModel
@@ -84,7 +84,11 @@ class WorkplaceServices:
             select(WorkplaceModel)
             .options(
                 selectinload(WorkplaceModel.employees)
-                .selectinload(EmployeeModel.user)
+                .selectinload(EmployeeModel.user),
+                with_loader_criteria(
+                    EmployeeModel,
+                    EmployeeModel.is_active,
+                ),
             )
             .where(WorkplaceModel.id == workplace_id)
         )
@@ -123,3 +127,21 @@ class WorkplaceServices:
         await self.db.commit()
 
         return result
+
+
+    async def delete_workplace(
+        self,
+        workplace_id: int,
+    ):
+        result = await self.db.scalar(
+            select(WorkplaceModel)
+            .where(WorkplaceModel.id == workplace_id)
+        )
+
+        if result is None:
+            raise WorkplaceNotFoundException(
+                "Workplace not found"
+            )
+
+        await self.db.delete(result)
+        await self.db.commit()
