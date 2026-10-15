@@ -9,6 +9,10 @@ from app.workplaces.schemas import WorkplaceCreate, WorkplaceUpdate
 
 from app.employees.model import Employee as EmployeeModel
 
+from app.shifts.model import Shift as ShiftModel
+
+from app.shift_templates.models import ShiftTemplate as ShiftTemplateModel
+
 from app.exceptions import WorkplaceExistsException, WorkplaceNotFoundException
 
 
@@ -135,7 +139,10 @@ class WorkplaceServices:
     ):
         result = await self.db.scalar(
             select(WorkplaceModel)
-            .where(WorkplaceModel.id == workplace_id)
+            .where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active
+            )
         )
 
         if result is None:
@@ -143,5 +150,24 @@ class WorkplaceServices:
                 "Workplace not found"
             )
 
-        await self.db.delete(result)
+        await self.db.execute(
+            update(EmployeeModel)
+            .where(EmployeeModel.workplace_id == workplace_id)
+            .values(is_active=False)
+        )
+
+        await self.db.execute(
+            update(ShiftModel)
+            .where(ShiftModel.workplace_id == workplace_id)
+            .values(is_active=False)
+        )
+
+        await self.db.execute(
+            update(ShiftTemplateModel)
+            .where(ShiftTemplateModel.workplace_id == workplace_id)
+            .values(is_active=False)
+        )
+
+        result.is_active = False
+
         await self.db.commit()
