@@ -95,3 +95,23 @@ async def update_workplace(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg
         )
+
+
+@router.delete(
+    "/{workplace_id}",
+    response_model=dict,
+)
+async def delete_workplace(
+    workplace_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: UserModel = Depends(get_current_owner),
+):
+    try:
+        services = WorkplaceServices(db)
+        await services.delete_workplace(workplace_id)
+        return {"detail": "Workplace deleted successfully"}
+    except WorkplaceNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
