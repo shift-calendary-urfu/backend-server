@@ -11,11 +11,18 @@ from app.workplaces.schemas import (
 )
 from app.workplaces.services import WorkplaceServices
 
+from app.employees.schemas import EmployeeResponse
+
 from app.users.model import User as UserModel
 
 
 from app.core.database import get_db
-from app.core.security import get_current_user, get_owner_or_admin, get_current_owner
+from app.core.security import (
+    get_current_user, 
+    get_owner_or_admin, 
+    get_current_owner,
+    get_owner_or_employees
+)
 
 from app.exceptions import WorkplaceExistsException, WorkplaceNotFoundException
 
@@ -110,6 +117,28 @@ async def delete_workplace(
         services = WorkplaceServices(db)
         await services.delete_workplace(workplace_id)
         return {"detail": "Workplace deleted successfully"}
+    except WorkplaceNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
+
+
+# ===========================
+# TODO: TEST THIS ENDPOINT!!!
+# ===========================
+@router.get(
+    "/{workplace_id}/employees",
+    response_model=list[EmployeeResponse]
+)
+async def get_employees_by_workplace(
+    workplace_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: UserModel = Depends(get_owner_or_employees),
+):
+    try:
+        services = WorkplaceServices(db)
+        return await services.get_employees_by_workplace(workplace_id)
     except WorkplaceNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
