@@ -259,4 +259,37 @@ async def get_current_owner(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You must be the owner of this workplace",
         )
+
+
+async def get_owner_or_employees(
+    workplace_id: int,
+    user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserModel:
+    is_owner = await db.scalar(
+        select(WorkplaceModel.id).where(
+            WorkplaceModel.id == workplace_id,
+            WorkplaceModel.owner_id == user.id,
+
+        )
+    )
+
+    if is_owner is not None:
+        return user
+
+    is_employee = await db.scalar(
+        select(EmployeeModel.id).where(
+            EmployeeModel.workplace_id == workplace_id,
+            EmployeeModel.user_id == user.id,
+            EmployeeModel.is_active,
+        )
+    )
+
+    if is_employee is not None:
+        return user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You must be the owner or employee of this workplace",
+    )
     
