@@ -178,3 +178,25 @@ class WorkplaceServices:
         result.is_active = False
 
         await self.db.commit()
+
+
+    async def get_employees_by_workplace(
+        self, 
+        workplace_id: int,
+    ):
+        result = await self.db.scalars(
+            select(EmployeeModel)
+            .options(
+                selectinload(EmployeeModel.user),
+                with_loader_criteria(
+                    UserModel,
+                    UserModel.is_active,
+                )
+            )
+            .where(
+                EmployeeModel.workplace_id == workplace_id,
+                EmployeeModel.is_active
+            )
+        )
+
+        return list(result.all())
