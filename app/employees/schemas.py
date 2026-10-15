@@ -5,6 +5,7 @@ from typing import Annotated
 from datetime import date
 
 class EmployeeUserResponse(BaseModel):
+    id: Annotated[int, Field(description="ID пользователя")]
     first_name: Annotated[str, Field(description="Имя пользователя")]
     second_name: Annotated[str, Field(description="Фамилия пользователя")]
     third_name: Annotated[str | None, Field(description="Отчество пользователя")]
