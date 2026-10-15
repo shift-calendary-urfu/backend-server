@@ -31,7 +31,8 @@ class WorkplaceServices:
             .where(
                 WorkplaceModel.address == workplace_data.address,
                 WorkplaceModel.workplace_type==workplace_data.workplace_type,
-                WorkplaceModel.owner_id == owner.id
+                WorkplaceModel.owner_id == owner.id,
+                WorkplaceModel.is_active
             )
         )
         if result is not None:
@@ -72,6 +73,7 @@ class WorkplaceServices:
             select(WorkplaceModel).where(
                 or_(
                     WorkplaceModel.owner_id == user.id,
+                    WorkplaceModel.is_active,
                     WorkplaceModel.id.in_(employee_workplaces),
                 )
             )
@@ -94,7 +96,10 @@ class WorkplaceServices:
                     EmployeeModel.is_active,
                 ),
             )
-            .where(WorkplaceModel.id == workplace_id)
+            .where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active
+                )
         )
 
         if result is None:
@@ -112,7 +117,9 @@ class WorkplaceServices:
     ):
         result = await self.db.scalar(
             select(WorkplaceModel)
-            .where(WorkplaceModel.id == workplace_id)
+            .where(WorkplaceModel.id == workplace_id,
+                   WorkplaceModel.is_active
+                   )
         )
 
         if result is None:
