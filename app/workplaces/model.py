@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, func, Time
+from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, func, Time, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, time
 
@@ -29,6 +29,7 @@ class Workplace(Base):
     work_start_time: Mapped[time] = mapped_column(Time, nullable=False)
     work_end_time: Mapped[time] = mapped_column(Time, nullable=False)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean,default=True)
 
     user: Mapped["User"] = relationship("User", back_populates="workplaces")
     employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="workplace")

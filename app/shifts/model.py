@@ -1,4 +1,15 @@
-from sqlalchemy import Integer, String, Text, DateTime, Date, ForeignKey, func, Time, CheckConstraint
+from sqlalchemy import (
+    Integer, 
+    String, 
+    Text, 
+    DateTime, 
+    Date, 
+    ForeignKey, 
+    func, 
+    Time, 
+    CheckConstraint, 
+    Boolean
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, time, date as dt_date
 
@@ -33,6 +44,8 @@ class Shift(Base):
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="planned", nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean,default=True)
+
 
     workplace: Mapped["Workplace"] = relationship("Workplace", back_populates="shifts")
     employee: Mapped["Employee"] = relationship("Employee", back_populates="shifts")
