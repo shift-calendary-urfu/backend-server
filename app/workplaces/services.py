@@ -73,9 +73,9 @@ class WorkplaceServices:
             select(WorkplaceModel).where(
                 or_(
                     WorkplaceModel.owner_id == user.id,
-                    WorkplaceModel.is_active,
                     WorkplaceModel.id.in_(employee_workplaces),
-                )
+                ),
+                WorkplaceModel.is_active,
             )
         )
 
