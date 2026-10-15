@@ -72,7 +72,7 @@ async def get_all_workspaces_for_user(
 async def get_workplace_by_id(
     workplace_id: int,
     db: AsyncSession = Depends(get_db),
-    _: UserModel = Depends(get_owner_or_admin),
+    _: UserModel = Depends(get_owner_or_employees),
 ):
     try:
         services = WorkplaceServices(db)
