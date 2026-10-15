@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 from sqlalchemy import select, or_, update
 
 from app.users.model import User as UserModel
@@ -8,6 +8,10 @@ from app.workplaces.model import Workplace as WorkplaceModel
 from app.workplaces.schemas import WorkplaceCreate, WorkplaceUpdate
 
 from app.employees.model import Employee as EmployeeModel
+
+from app.shifts.model import Shift as ShiftModel
+
+from app.shift_templates.models import ShiftTemplate as ShiftTemplateModel
 
 from app.exceptions import WorkplaceExistsException, WorkplaceNotFoundException
 
@@ -27,7 +31,8 @@ class WorkplaceServices:
             .where(
                 WorkplaceModel.address == workplace_data.address,
                 WorkplaceModel.workplace_type==workplace_data.workplace_type,
-                WorkplaceModel.owner_id == owner.id
+                WorkplaceModel.owner_id == owner.id,
+                WorkplaceModel.is_active
             )
         )
         if result is not None:
@@ -69,7 +74,8 @@ class WorkplaceServices:
                 or_(
                     WorkplaceModel.owner_id == user.id,
                     WorkplaceModel.id.in_(employee_workplaces),
-                )
+                ),
+                WorkplaceModel.is_active,
             )
         )
 
@@ -84,9 +90,16 @@ class WorkplaceServices:
             select(WorkplaceModel)
             .options(
                 selectinload(WorkplaceModel.employees)
-                .selectinload(EmployeeModel.user)
+                .selectinload(EmployeeModel.user),
+                with_loader_criteria(
+                    EmployeeModel,
+                    EmployeeModel.is_active,
+                ),
             )
-            .where(WorkplaceModel.id == workplace_id)
+            .where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active
+                )
         )
 
         if result is None:
@@ -104,7 +117,9 @@ class WorkplaceServices:
     ):
         result = await self.db.scalar(
             select(WorkplaceModel)
-            .where(WorkplaceModel.id == workplace_id)
+            .where(WorkplaceModel.id == workplace_id,
+                   WorkplaceModel.is_active
+                   )
         )
 
         if result is None:
@@ -123,3 +138,43 @@ class WorkplaceServices:
         await self.db.commit()
 
         return result
+
+
+    async def delete_workplace(
+        self,
+        workplace_id: int,
+    ):
+        result = await self.db.scalar(
+            select(WorkplaceModel)
+            .where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active
+            )
+        )
+
+        if result is None:
+            raise WorkplaceNotFoundException(
+                "Workplace not found"
+            )
+
+        await self.db.execute(
+            update(EmployeeModel)
+            .where(EmployeeModel.workplace_id == workplace_id)
+            .values(is_active=False)
+        )
+
+        await self.db.execute(
+            update(ShiftModel)
+            .where(ShiftModel.workplace_id == workplace_id)
+            .values(is_active=False)
+        )
+
+        await self.db.execute(
+            update(ShiftTemplateModel)
+            .where(ShiftTemplateModel.workplace_id == workplace_id)
+            .values(is_active=False)
+        )
+
+        result.is_active = False
+
+        await self.db.commit()
