@@ -49,6 +49,9 @@ class EmployeeUserResponse(BaseModel):
         default=None,
         description="Отчество пользователя"
     )]
+    phone: Annotated[str, Field(
+        description="Телефон пользователя"
+    )]
 
 
 class EmployeeResponse(BaseModel):
