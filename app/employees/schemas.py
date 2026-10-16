@@ -4,11 +4,53 @@ from typing import Annotated
 
 from datetime import date
 
+
+class EmployeeCreate(BaseModel):
+    phone: Annotated[str, Field(
+        pattern=r"^((\+7|8)[0-9]{10})$",
+        description="Телефон сотрудника (формат: +7XXXXXXXXXX, 8XXXXXXXXXX)"
+    )]
+    workplace_id: Annotated[int, Field(
+        description="ID рабочего пространства"
+    )]
+    role: Annotated[str, Field(
+        pattern="^(owner|admin|employee)$",
+        description="Роль сотрудника ('owner', 'admin', 'employee')"
+    )]
+    position: Annotated[str | None, Field(
+        description="Должность сотрудника"
+    )]
+    hire_date: Annotated[date | None, Field(
+        description="Дата найма сотрудника"
+    )]
+
+
+class EmployeeUpdate(BaseModel):
+    role: Annotated[str | None, Field(
+        pattern="^(owner|admin|employee)$",
+        description="Роль сотрудника ('admin', 'employee')"
+    )]
+    position: Annotated[str | None, Field(
+        description="Должность сотрудника"
+    )]
+    hire_date: Annotated[date | None, Field(
+        description="Дата найма сотрудника"
+    )]
+
+
 class EmployeeUserResponse(BaseModel):
-    id: Annotated[int, Field(description="ID пользователя")]
-    first_name: Annotated[str, Field(description="Имя пользователя")]
-    second_name: Annotated[str, Field(description="Фамилия пользователя")]
-    third_name: Annotated[str | None, Field(description="Отчество пользователя")]
+    id: Annotated[int, Field(
+        description="ID пользователя"
+    )]
+    first_name: Annotated[str, Field(
+        description="Имя пользователя"
+    )]
+    second_name: Annotated[str, Field(
+        description="Фамилия пользователя"
+    )]
+    third_name: Annotated[str | None, Field(
+        description="Отчество пользователя"
+    )]
 
 
 class EmployeeResponse(BaseModel):
@@ -22,7 +64,8 @@ class EmployeeResponse(BaseModel):
         description="ID рабочего пространства"
     )]
     role: Annotated[str, Field(
-        description="Роль сотрудника"
+        pattern="^(owner|admin|employee)$",
+        description="Роль сотрудника ('owner', 'admin', 'employee')"
     )]
     position: Annotated[str | None, Field(
         description="Должность сотрудника"
