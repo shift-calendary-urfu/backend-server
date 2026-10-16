@@ -16,6 +16,7 @@ from app.core.security import (
     get_current_user,
     get_owner_or_admin,
     get_owner_or_employees,
+    check_workplace_access
 )
 from app.core.database import get_db
 
@@ -23,6 +24,7 @@ from app.exceptions import (
     WorkplaceNotFoundException,
     UserNotFoundException,
     EmployeeAlreadyInWorkPlaceExceprion,
+    EmployeeNotFoundException
 )
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
@@ -61,9 +63,6 @@ async def create_employee(
         )
 
 
-# Получение сотрудника по ID.
-# Схема ответа есть.
-# Доступно владельцу или работнику
 @router.get(
     "/{employee_id}",
     response_model=EmployeeResponse,
@@ -73,49 +72,24 @@ async def get_employee(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    # 1. Ищем сотрудника по ID
-    employee = await db.scalar(
-        select(EmployeeModel)
-        .options(selectinload(EmployeeModel.user))
-        .where(EmployeeModel.id == employee_id)
-    )
-
-    if employee is None:
+    """
+    Получение информации о пользователе по его ID.
+    Доступно только владельцу или работнику рабочего пространства.
+    """
+    try: 
+        services_emplpoyee = EmployeeServices(db)
+        employee = await services_emplpoyee.get_employee_by_id(employee_id)
+        await check_workplace_access(
+            employee.workplace_id, current_user, db
+        )
+        return employee
+    except EmployeeNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Employee not found",
+            detail=e.msg,
         )
 
-    # 2. Проверяем, является ли текущий пользователь владельцем
-    owner_id = await db.scalar(
-        select(WorkplaceModel.owner_id).where(
-            WorkplaceModel.id == employee.workplace_id
-        )
-    )
 
-    # 3. Если пользователь не владелец, проверяем,
-    # является ли он активным сотрудником этого рабочего места
-    if owner_id != current_user.id:
-        is_employee = await db.scalar(
-            select(EmployeeModel.id).where(
-                EmployeeModel.workplace_id == employee.workplace_id,
-                EmployeeModel.user_id == current_user.id,
-                EmployeeModel.is_active.is_(True),
-            )
-        )
-
-        if is_employee is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You must be the owner or an employee of this workplace",
-            )
-
-    # 4. Возвращаем найденного сотрудника
-    return employee
-
-
-# Мягкое удаления сотрудника (Employee.is_active = False) по ID.
-# Доступ только для администратора или владельца.
 @router.delete(
     "/{employee_id}",
     response_model=dict,
@@ -123,7 +97,7 @@ async def get_employee(
 async def delete_employee(
     employee_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_owner_or_admin),
 ):
     # 1. Ищем сотрудника
     employee = await db.scalar(
