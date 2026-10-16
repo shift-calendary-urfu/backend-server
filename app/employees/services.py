@@ -26,12 +26,13 @@ class EmployeeServices:
 
     async def create_employee(
         self, 
-        employee_data: EmployeeCreate
+        employee_data: EmployeeCreate,
+        workplace_id: int
     ) -> EmployeeModel:
 
         workplace = await self.db.scalar(
             select(WorkplaceModel).where(
-                WorkplaceModel.id == employee_data.workplace_id,
+                WorkplaceModel.id == workplace_id,
                 WorkplaceModel.is_active
             )
         )
@@ -56,7 +57,7 @@ class EmployeeServices:
         existing_employee = await self.db.scalar(
                 select(EmployeeModel).where(
                     EmployeeModel.user_id == user.id,
-                    EmployeeModel.workplace_id == employee_data.workplace_id,
+                    EmployeeModel.workplace_id == workplace_id,
                     )
                 )
 
@@ -71,7 +72,7 @@ class EmployeeServices:
                 .where(EmployeeModel.id == existing_employee.id)
                 .values(
                     **employee_data.model_dump(
-                        exclude={"phone", "workplace_id"}
+                        exclude={"phone"}
                     ),
                     is_active=True,
                     hire_date=date.today(),
