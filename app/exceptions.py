@@ -21,7 +21,7 @@ class InvalidPasswordException(Exception):
         self.msg = msg
         super().__init__(self.msg)
 
-        
+
 class WorkplaceNotFoundException(Exception):
     def __init__(self, msg: str):
         self.msg = msg
@@ -29,6 +29,18 @@ class WorkplaceNotFoundException(Exception):
 
 
 class WorkplaceExistsException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class UserNotFoundException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class EmployeeAlreadyInWorkPlaceExceprion(Exception):
     def __init__(self, msg: str):
         self.msg = msg
         super().__init__(self.msg)
