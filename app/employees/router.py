@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
+from typing import Annotated
 
 from app.users.model import User as UserModel
 
@@ -35,6 +37,9 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
     status_code=status.HTTP_201_CREATED,
 )
 async def create_employee(
+    workplace_id: Annotated[int, Query(
+        description="ID рабочего пространства"
+    )],
     employee_data: EmployeeCreate,
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_owner_or_admin),
@@ -46,7 +51,7 @@ async def create_employee(
     """
     try:
         employee_services = EmployeeServices(db)
-        return await employee_services.create_employee(employee_data)
+        return await employee_services.create_employee(employee_data, workplace_id)
     except (
         WorkplaceNotFoundException, 
         UserNotFoundException, 
@@ -78,9 +83,11 @@ async def get_employee(
     try: 
         services = EmployeeServices(db)
         employee = await services.get_employee_by_id(employee_id)
+
         await get_owner_or_employees(
             employee.workplace_id, current_user, db
         )
+
         return employee
     except EmployeeNotFoundException as e:
         raise HTTPException(
