@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 
 from app.employees.model import Employee as EmployeeModel
@@ -12,6 +13,7 @@ from app.exceptions import (
     WorkplaceNotFoundException,
     UserNotFoundException,
     EmployeeAlreadyInWorkPlaceExceprion,
+    EmployeeNotFoundException
 )
 
 
@@ -74,3 +76,25 @@ class EmployeeServices:
         await self.db.refresh(new_employee, attribute_names=["user"])
 
         return new_employee
+
+
+    async def get_employee_by_id(
+        self, 
+        employee_id: int
+    ) -> EmployeeModel:
+
+        employee = await self.db.scalar(
+                select(EmployeeModel)
+                .options(selectinload(EmployeeModel.user))
+                .where(
+                    EmployeeModel.id == employee_id,
+                    EmployeeModel.is_active
+                    )
+                )
+
+        if employee is None:
+            raise EmployeeNotFoundException(
+                "Employee not found"
+            )
+
+        return employee
