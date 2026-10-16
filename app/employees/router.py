@@ -28,7 +28,10 @@ from app.exceptions import (
     EmployeeNotFoundException
 )
 
-router = APIRouter(prefix="/employees", tags=["Employees"])
+router = APIRouter(
+    prefix="/employees", 
+    tags=["Employees"]
+)
 
 
 @router.post(
@@ -37,10 +40,10 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
     status_code=status.HTTP_201_CREATED,
 )
 async def create_employee(
-    workplace_id: Annotated[int, Query(
-        description="ID рабочего пространства"
-    )],
     employee_data: EmployeeCreate,
+    workplace_id: Annotated[int, Query(
+            description="ID рабочего пространства"
+    )],
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_owner_or_admin),
 ):
@@ -51,6 +54,7 @@ async def create_employee(
     """
     try:
         employee_services = EmployeeServices(db)
+        
         return await employee_services.create_employee(employee_data, workplace_id)
     except (
         WorkplaceNotFoundException, 
@@ -73,8 +77,11 @@ async def create_employee(
 )
 async def get_employee(
     employee_id: int,
+    workplace_id: Annotated[int, Query(
+        description="ID рабочего пространства"
+    )],
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(get_owner_or_employees),
 ):
     """
     Получение информации о пользователе по его ID.
@@ -82,13 +89,8 @@ async def get_employee(
     """
     try: 
         services = EmployeeServices(db)
-        employee = await services.get_employee_by_id(employee_id)
 
-        await get_owner_or_employees(
-            employee.workplace_id, current_user, db
-        )
-
-        return employee
+        return await services.get_employee_by_id(employee_id, workplace_id)
     except EmployeeNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -102,8 +104,11 @@ async def get_employee(
 )
 async def delete_employee(
     employee_id: int,
+    workplace_id: Annotated[int, Query(
+        description="ID рабочего пространства"
+    )],
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(get_owner_or_admin),
 ):
     """
     Удаляет сотрудника из системы.
@@ -111,15 +116,7 @@ async def delete_employee(
     """
     try:
         services = EmployeeServices(db)
-        employee = await services.get_employee_by_id(employee_id)
-
-        await get_owner_or_admin(
-            workplace_id=employee.workplace_id,
-            user=current_user,
-            db=db,
-        )
-
-        await services.delete_employee(employee_id)
+        await services.delete_employee(employee_id, workplace_id)
 
         return {"message": "Employee deactivated successfully"}
     except EmployeeNotFoundException as e:
