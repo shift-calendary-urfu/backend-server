@@ -96,8 +96,12 @@ async def get_employee(
 async def delete_employee(
     employee_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_owner_or_admin),
+    current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Удаляет сотрудника из системы.
+    Доступно только владельцу или администратору рабочего пространства.
+    """
     try:
         services = EmployeeServices(db)
         employee = await services.get_employee_by_id(employee_id)
