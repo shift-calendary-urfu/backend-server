@@ -101,7 +101,8 @@ class EmployeeServices:
 
     async def get_employee_by_id(
         self, 
-        employee_id: int
+        employee_id: int,
+        workplace_id: int
     ) -> EmployeeModel:
 
         employee = await self.db.scalar(
@@ -109,6 +110,7 @@ class EmployeeServices:
                 .options(selectinload(EmployeeModel.user))
                 .where(
                     EmployeeModel.id == employee_id,
+                    EmployeeModel.workplace_id==workplace_id,
                     EmployeeModel.is_active
                     )
                 )
@@ -123,12 +125,14 @@ class EmployeeServices:
 
     async def delete_employee(
         self, 
-        employee_id: int
+        employee_id: int,
+        workplace_id: int
     ) -> None:
 
         employee = await self.db.scalar(
                 select(EmployeeModel).where(
                     EmployeeModel.id == employee_id,
+                    EmployeeModel.workplace_id == workplace_id,
                     EmployeeModel.is_active
                     )
                 )
