@@ -2,6 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 
+from datetime import date
+
 from app.employees.model import Employee as EmployeeModel
 from app.employees.schemas import EmployeeCreate
 
@@ -52,17 +54,25 @@ class EmployeeServices:
             )
 
         existing_employee = await self.db.scalar(
-                select(EmployeeModel.id).where(
+                select(EmployeeModel).where(
                     EmployeeModel.user_id == user.id,
                     EmployeeModel.workplace_id == employee_data.workplace_id,
-                    EmployeeModel.is_active
                     )
                 )
 
         if existing_employee is not None:
-            raise EmployeeAlreadyInWorkPlaceExceprion(
-                "Employee already exists in this workplace"
-            )
+            if existing_employee.is_active:
+                raise EmployeeAlreadyInWorkPlaceExceprion(
+                    "Employee already exists in this workplace"
+                )
+            
+            existing_employee.is_active = True
+            existing_employee.hire_date = date.today()
+
+            await self.db.commit()
+            await self.db.refresh(existing_employee, attribute_names=["user"])
+
+            return existing_employee
 
         
         new_employee = EmployeeModel(
