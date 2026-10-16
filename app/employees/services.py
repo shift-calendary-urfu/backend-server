@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from datetime import date
 
@@ -66,8 +66,18 @@ class EmployeeServices:
                     "Employee already exists in this workplace"
                 )
             
-            existing_employee.is_active = True
-            existing_employee.hire_date = date.today()
+            await self.db.execute(
+                update(EmployeeModel)
+                .where(EmployeeModel.id == existing_employee.id)
+                .values(
+                    **employee_data.model_dump(
+                        exclude={"phone", "workplace_id"}
+                    ),
+                    is_active=True,
+                    hire_date=date.today(),
+                )
+            )
+
 
             await self.db.commit()
             await self.db.refresh(existing_employee, attribute_names=["user"])
