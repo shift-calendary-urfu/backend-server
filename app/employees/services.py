@@ -98,3 +98,25 @@ class EmployeeServices:
             )
 
         return employee
+
+
+    async def delete_employee(
+        self, 
+        employee_id: int
+    ) -> None:
+
+        employee = await self.db.scalar(
+                select(EmployeeModel).where(
+                    EmployeeModel.id == employee_id,
+                    EmployeeModel.is_active
+                    )
+                )
+
+        if employee is None:
+            raise EmployeeNotFoundException(
+                "Employee not found"
+            )
+
+        employee.is_active = False
+        
+        await self.db.commit()
