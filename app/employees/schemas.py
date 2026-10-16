@@ -10,9 +10,6 @@ class EmployeeCreate(BaseModel):
         pattern=r'^(\+7\d{10}|8\d{10})$',
         description="Телефон сотрудника (формат: +7XXXXXXXXXX, 8XXXXXXXXXX)"
     )]
-    workplace_id: Annotated[int, Field(
-        description="ID рабочего пространства"
-    )]
     role: Annotated[str, Field(
         pattern="^(owner|admin|employee)$",
         description="Роль сотрудника ('owner', 'admin', 'employee')"
