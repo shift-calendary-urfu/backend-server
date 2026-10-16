@@ -292,15 +292,3 @@ async def get_owner_or_employees(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You must be the owner or employee of this workplace",
     )
-
-
-async def check_workplace_access(
-    workplace_id: int,
-    user: UserModel,
-    db: AsyncSession,
-):
-    await get_owner_or_employees(
-        workplace_id=workplace_id,
-        user=user,
-        db=db,
-    )
