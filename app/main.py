@@ -7,8 +7,11 @@ from app.workplaces.router import router as workplaces_router
 from app.employees.router import router as employees_router
 
 from app.config import settings
+from app.core.logger import get_logger
 
-# ----- Fast API ----- 
+logger = get_logger(__name__)
+
+# ----- Fast API -----
 app = FastAPI(
     title="Shift calendary. Server",
     version='0.1.0'
@@ -44,6 +47,10 @@ app.include_router(workplaces_router)
 app.include_router(employees_router)
 
 # ------------------
+
+logger.info("Приложение 'Календарь смен' запущено (v%s)", app.version)
+logger.info("CORS origins: %s", settings.CORS_ORIGINS)
+logger.info("База данных: %s:%s/%s", settings.POSTGRES_HOST, settings.POSTGRES_PORT, settings.POSTGRES_DB)
 
 
 
