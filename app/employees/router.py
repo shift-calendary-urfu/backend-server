@@ -46,7 +46,7 @@ async def create_employee(
     )],
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_owner_or_admin),
-):
+) -> EmployeeModel:
     """
     Создание нового пользователя в системе или восстановление существующего.
     Возвращает созданного юзера.
@@ -82,7 +82,7 @@ async def get_employee(
     )],
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_owner_or_employees),
-):
+) -> EmployeeModel:
     """
     Получение информации о пользователе по его ID.
     Доступно только владельцу или работнику рабочего пространства.
@@ -109,7 +109,7 @@ async def delete_employee(
     )],
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_owner_or_admin),
-):
+) -> dict:
     """
     Удаляет сотрудника из системы.
     Доступно только владельцу или администратору рабочего пространства.
