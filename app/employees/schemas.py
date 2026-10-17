@@ -7,34 +7,28 @@ from datetime import date
 
 class EmployeeCreate(BaseModel):
     phone: Annotated[str, Field(
-        pattern=r"^((\+7|8)[0-9]{10})$",
+        pattern=r'^(\+7\d{10}|8\d{10})$',
         description="Телефон сотрудника (формат: +7XXXXXXXXXX, 8XXXXXXXXXX)"
-    )]
-    workplace_id: Annotated[int, Field(
-        description="ID рабочего пространства"
     )]
     role: Annotated[str, Field(
         pattern="^(owner|admin|employee)$",
         description="Роль сотрудника ('owner', 'admin', 'employee')"
     )]
     position: Annotated[str | None, Field(
+        default=None,
         description="Должность сотрудника"
-    )]
-    hire_date: Annotated[date | None, Field(
-        description="Дата найма сотрудника"
     )]
 
 
 class EmployeeUpdate(BaseModel):
     role: Annotated[str | None, Field(
+        default=None,
         pattern="^(owner|admin|employee)$",
         description="Роль сотрудника ('admin', 'employee')"
     )]
     position: Annotated[str | None, Field(
+        default=None,
         description="Должность сотрудника"
-    )]
-    hire_date: Annotated[date | None, Field(
-        description="Дата найма сотрудника"
     )]
 
 
@@ -49,7 +43,11 @@ class EmployeeUserResponse(BaseModel):
         description="Фамилия пользователя"
     )]
     third_name: Annotated[str | None, Field(
+        default=None,
         description="Отчество пользователя"
+    )]
+    phone: Annotated[str, Field(
+        description="Телефон пользователя"
     )]
 
 
@@ -68,9 +66,11 @@ class EmployeeResponse(BaseModel):
         description="Роль сотрудника ('owner', 'admin', 'employee')"
     )]
     position: Annotated[str | None, Field(
+        default=None,
         description="Должность сотрудника"
     )]
     hire_date: Annotated[date | None, Field(
+        default=None,
         description="Дата найма сотрудника"
     )]
     is_active: Annotated[bool, Field(

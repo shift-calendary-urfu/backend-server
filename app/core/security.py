@@ -292,4 +292,3 @@ async def get_owner_or_employees(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You must be the owner or employee of this workplace",
     )
-    
