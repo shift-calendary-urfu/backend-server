@@ -1,21 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from typing import Annotated
 
 from app.users.model import User as UserModel
 
-from app.workplaces.model import Workplace as WorkplaceModel
 
 from app.employees.model import Employee as EmployeeModel
 from app.employees.schemas import EmployeeResponse, EmployeeCreate
 from app.employees.services import EmployeeServices
 
 from app.core.security import (
-    get_current_user,
     get_owner_or_admin,
     get_owner_or_employees,
 )
