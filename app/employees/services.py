@@ -11,12 +11,16 @@ from app.users.model import User as UserModel
 
 from app.workplaces.model import Workplace as WorkplaceModel
 
+from app.core.logger import get_logger
+
 from app.exceptions import (
     WorkplaceNotFoundException,
     UserNotFoundException,
     EmployeeAlreadyInWorkPlaceExceprion,
     EmployeeNotFoundException
 )
+
+logger = get_logger(__name__)
 
 
 class EmployeeServices:
@@ -25,10 +29,15 @@ class EmployeeServices:
 
 
     async def create_employee(
-        self, 
+        self,
         employee_data: EmployeeCreate,
         workplace_id: int
     ) -> EmployeeModel:
+
+        logger.info(
+            "Добавление сотрудника: phone=%s, workplace_id=%s",
+            employee_data.phone, workplace_id
+        )
 
         workplace = await self.db.scalar(
             select(WorkplaceModel).where(
@@ -38,6 +47,7 @@ class EmployeeServices:
         )
 
         if workplace is None:
+            logger.warning("Точка не найдена: workplace_id=%s", workplace_id)
             raise WorkplaceNotFoundException(
                 "Workplace not found"
             )
@@ -48,8 +58,12 @@ class EmployeeServices:
                     UserModel.is_active
                     )
                 )
-        
+
         if user is None:
+            logger.warning(
+                "Пользователь с телефоном %s не найден",
+                employee_data.phone
+            )
             raise UserNotFoundException(
                 "User with this phone number not found"
             )
@@ -63,10 +77,19 @@ class EmployeeServices:
 
         if existing_employee is not None:
             if existing_employee.is_active:
+                logger.warning(
+                    "Сотрудник уже работает: user_id=%s, workplace_id=%s",
+                    user.id, workplace_id
+                )
                 raise EmployeeAlreadyInWorkPlaceExceprion(
                     "Employee already exists in this workplace"
                 )
-            
+
+            logger.info(
+                "Восстановление сотрудника: employee_id=%s, workplace_id=%s",
+                existing_employee.id, workplace_id
+            )
+
             await self.db.execute(
                 update(EmployeeModel)
                 .where(EmployeeModel.id == existing_employee.id)
@@ -83,12 +106,14 @@ class EmployeeServices:
             await self.db.commit()
             await self.db.refresh(existing_employee, attribute_names=["user"])
 
+            logger.info("Сотрудник восстановлен: employee_id=%s", existing_employee.id)
+
             return existing_employee
 
-        
+
         new_employee = EmployeeModel(
             user_id=user.id,
-            **employee_data.model_dump(exclude={"phone"}) 
+            **employee_data.model_dump(exclude={"phone"})
         )
 
         self.db.add(new_employee)
@@ -96,14 +121,24 @@ class EmployeeServices:
 
         await self.db.refresh(new_employee, attribute_names=["user"])
 
+        logger.info(
+            "Сотрудник добавлен: employee_id=%s, user_id=%s, workplace_id=%s",
+            new_employee.id, user.id, workplace_id
+        )
+
         return new_employee
 
 
     async def get_employee_by_id(
-        self, 
+        self,
         employee_id: int,
         workplace_id: int
     ) -> EmployeeModel:
+
+        logger.info(
+            "Получение сотрудника: employee_id=%s, workplace_id=%s",
+            employee_id, workplace_id
+        )
 
         employee = await self.db.scalar(
                 select(EmployeeModel)
@@ -116,18 +151,29 @@ class EmployeeServices:
                 )
 
         if employee is None:
+            logger.warning(
+                "Сотрудник не найден: employee_id=%s, workplace_id=%s",
+                employee_id, workplace_id
+            )
             raise EmployeeNotFoundException(
                 "Employee not found"
             )
+
+        logger.info("Сотрудник найден: employee_id=%s", employee.id)
 
         return employee
 
 
     async def delete_employee(
-        self, 
+        self,
         employee_id: int,
         workplace_id: int
     ) -> None:
+
+        logger.info(
+            "Деактивация сотрудника: employee_id=%s, workplace_id=%s",
+            employee_id, workplace_id
+        )
 
         employee = await self.db.scalar(
                 select(EmployeeModel).where(
@@ -138,10 +184,16 @@ class EmployeeServices:
                 )
 
         if employee is None:
+            logger.warning(
+                "Сотрудник для деактивации не найден: employee_id=%s, workplace_id=%s",
+                employee_id, workplace_id
+            )
             raise EmployeeNotFoundException(
                 "Employee not found"
             )
 
         employee.is_active = False
-        
+
         await self.db.commit()
+
+        logger.info("Сотрудник деактивирован: employee_id=%s", employee_id)
