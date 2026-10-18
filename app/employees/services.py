@@ -234,13 +234,16 @@ class EmployeeServices:
                 EmployeeModel.workplace_id == workplace_id,
                 EmployeeModel.is_active
             )
-            .values(**employee_data.model_dump())
+            .values(**employee_data.model_dump(exclude_unset=True))
         )
         
 
         await self.db.commit()
         await self.db.refresh(employee, attribute_names=["user"])
 
-        logger.info("Сотрудник обновлен: employee_id=%s", employee.id)
+        logger.info(
+            "Сотрудник обновлен: employee_id=%s, workplace_id=%s", 
+            employee.id, workplace_id
+        )
 
         return employee
