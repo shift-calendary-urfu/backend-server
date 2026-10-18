@@ -32,13 +32,13 @@ class AuthServices:
         """
         Регистрирует нового пользователя.
         """
-        logger.info("Попытка регистрации пользователя: email=%s", user.email)
+        logger.info("Попытка регистрации пользователя")
 
         result = await self.db.scalar(
             select(UserModel).where(UserModel.email == user.email)
         )
         if result:
-            logger.warning("Регистрация отклонена: email=%s уже существует", user.email)
+            logger.warning("Регистрация отклонена: user_id=%s уже существует", result.id)
             raise EmailExistsException("Email уже зарегистрирован")
 
         db_user = UserModel(
@@ -53,7 +53,7 @@ class AuthServices:
         self.db.add(db_user)
         await self.db.commit()
 
-        logger.info("Пользователь зарегистрирован: email=%s, id=%s", db_user.email, db_user.id)
+        logger.info("Пользователь зарегистрирован: id=%s", db_user.id)
 
         return db_user
 
@@ -65,7 +65,7 @@ class AuthServices:
         """
         Авторизует существующего юзера, проверяя его учетные данные и возвращая токены.
         """
-        logger.info("Попытка входа: username=%s", form_data.username)
+        logger.info("Попытка входа")
 
         user = await self.db.scalar(
                 select(UserModel).where(
@@ -77,7 +77,7 @@ class AuthServices:
             form_data.password,
             user.hashed_password
         ):
-            logger.warning("Неудачная попытка входа: username=%s", form_data.username)
+            logger.warning("Неудачная попытка входа")
             raise UsernamePasswordException("Неверное имя пользователя или пароль.")
 
         access_token = self.auth_manager.create_access_token(
@@ -87,7 +87,7 @@ class AuthServices:
             data={'sub':user.email, 'id': user.id}
         )
 
-        logger.info("Успешный вход: user_id=%s, email=%s", user.id, user.email)
+        logger.info("Успешный вход: user_id=%s", user.id)
 
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
 

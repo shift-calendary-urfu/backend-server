@@ -35,8 +35,8 @@ class EmployeeServices:
     ) -> EmployeeModel:
 
         logger.info(
-            "Добавление сотрудника: phone=%s, workplace_id=%s",
-            employee_data.phone, workplace_id
+            "Добавление сотрудника: workplace_id=%s",
+            workplace_id
         )
 
         workplace = await self.db.scalar(
@@ -61,8 +61,7 @@ class EmployeeServices:
 
         if user is None:
             logger.warning(
-                "Пользователь с телефоном %s не найден",
-                employee_data.phone
+                "Пользователь с указанным телефоном не найден",
             )
             raise UserNotFoundException(
                 "User with this phone number not found"
