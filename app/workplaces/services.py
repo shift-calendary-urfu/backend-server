@@ -13,7 +13,11 @@ from app.shifts.model import Shift as ShiftModel
 
 from app.shift_templates.models import ShiftTemplate as ShiftTemplateModel
 
+from app.core.logger import get_logger
+
 from app.exceptions import WorkplaceExistsException, WorkplaceNotFoundException
+
+logger = get_logger(__name__)
 
 
 class WorkplaceServices:
@@ -21,10 +25,15 @@ class WorkplaceServices:
         self.db = db
 
     async def create_workplace(
-        self, 
+        self,
         workplace_data: WorkplaceCreate,
         owner: UserModel
     ) -> WorkplaceModel:
+
+        logger.info(
+            "Создание рабочей точки: name=%s, owner_id=%s",
+            workplace_data.name, owner.id
+        )
 
         result = await self.db.scalar(
             select(WorkplaceModel)
@@ -36,10 +45,14 @@ class WorkplaceServices:
             )
         )
         if result is not None:
+            logger.warning(
+                "Точка уже существует: address=%s, type=%s, owner_id=%s",
+                workplace_data.address, workplace_data.workplace_type, owner.id
+            )
             raise WorkplaceExistsException(
                 "Workplace with this address and type already exists."
             )
-        
+
         new_workplace=WorkplaceModel(
             name=workplace_data.name,
             address=workplace_data.address,
@@ -54,6 +67,8 @@ class WorkplaceServices:
         self.db.add(new_workplace)
         await self.db.commit()
 
+        logger.info("Точка создана: id=%s, name=%s", new_workplace.id, new_workplace.name)
+
         return new_workplace
 
 
@@ -61,6 +76,8 @@ class WorkplaceServices:
         self,
         user: UserModel,
     ):
+        logger.info("Получение всех точек пользователя: user_id=%s", user.id)
+
         employee_workplaces = (
         select(EmployeeModel.workplace_id)
         .where(
@@ -79,13 +96,18 @@ class WorkplaceServices:
             )
         )
 
-        return list(result.all())
+        workplaces = list(result.all())
+        logger.info("Найдено точек: %d для user_id=%s", len(workplaces), user.id)
+
+        return workplaces
 
 
     async def get_by_id(
         self,
         workplace_id: int,
     ):
+        logger.info("Получение точки по ID: workplace_id=%s", workplace_id)
+
         result = await self.db.scalar(
             select(WorkplaceModel)
             .options(
@@ -103,9 +125,12 @@ class WorkplaceServices:
         )
 
         if result is None:
+            logger.warning("Точка не найдена: workplace_id=%s", workplace_id)
             raise WorkplaceNotFoundException(
                 "Workplace not found"
             )
+
+        logger.info("Точка найдена: id=%s, name=%s", result.id, result.name)
 
         return result
 
@@ -115,6 +140,8 @@ class WorkplaceServices:
         workplace_id: int,
         workplace_data: WorkplaceUpdate,
     ):
+        logger.info("Обновление точки: workplace_id=%s", workplace_id)
+
         result = await self.db.scalar(
             select(WorkplaceModel)
             .where(WorkplaceModel.id == workplace_id,
@@ -123,6 +150,7 @@ class WorkplaceServices:
         )
 
         if result is None:
+            logger.warning("Точка для обновления не найдена: workplace_id=%s", workplace_id)
             raise WorkplaceNotFoundException(
                 "Workplace not found"
             )
@@ -137,6 +165,11 @@ class WorkplaceServices:
 
         await self.db.commit()
 
+        logger.info(
+            "Точка обновлена: workplace_id=%s, поля=%s",
+            workplace_id, list(update_data.keys())
+        )
+
         return result
 
 
@@ -144,6 +177,8 @@ class WorkplaceServices:
         self,
         workplace_id: int,
     ):
+        logger.info("Удаление точки: workplace_id=%s", workplace_id)
+
         result = await self.db.scalar(
             select(WorkplaceModel)
             .where(
@@ -153,6 +188,7 @@ class WorkplaceServices:
         )
 
         if result is None:
+            logger.warning("Точка для удаления не найдена: workplace_id=%s", workplace_id)
             raise WorkplaceNotFoundException(
                 "Workplace not found"
             )
@@ -179,11 +215,15 @@ class WorkplaceServices:
 
         await self.db.commit()
 
+        logger.info("Точка удалена (soft delete): workplace_id=%s", workplace_id)
+
 
     async def get_employees_by_workplace(
-        self, 
+        self,
         workplace_id: int,
     ):
+        logger.info("Получение сотрудников точки: workplace_id=%s", workplace_id)
+
         result = await self.db.scalars(
             select(EmployeeModel)
             .options(
@@ -199,4 +239,10 @@ class WorkplaceServices:
             )
         )
 
-        return list(result.all())
+        employees = list(result.all())
+        logger.info(
+            "Найдено сотрудников: %d для workplace_id=%s",
+            len(employees), workplace_id
+        )
+
+        return employees
