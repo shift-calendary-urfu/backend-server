@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 from datetime import date
 
 from app.employees.model import Employee as EmployeeModel
-from app.employees.schemas import EmployeeCreate
+from app.employees.schemas import EmployeeCreate, EmployeeUpdate
 
 from app.users.model import User as UserModel
 
@@ -196,3 +196,51 @@ class EmployeeServices:
         await self.db.commit()
 
         logger.info("Сотрудник деактивирован: employee_id=%s", employee_id)
+
+
+    async def update_employee(
+        self,
+        employee_id: int,
+        employee_data: EmployeeUpdate,
+        workplace_id: int,
+    ) -> EmployeeModel:
+
+        logger.info(
+            "Обновление сотрудника: employee_id=%s, workplace_id=%s",
+            employee_id, workplace_id
+        )
+
+        employee = await self.db.scalar(
+                select(EmployeeModel).where(
+                    EmployeeModel.id == employee_id,
+                    EmployeeModel.workplace_id == workplace_id,
+                    EmployeeModel.is_active
+                    )
+                )
+
+        if employee is None:
+            logger.warning(
+                "Сотрудник для обновления не найден: employee_id=%s, workplace_id=%s",
+                employee_id, workplace_id
+            )
+            raise EmployeeNotFoundException(
+                "Employee not found"
+            )
+
+        await self.db.execute(
+            update(EmployeeModel)
+            .where(
+                EmployeeModel.id == employee.id,
+                EmployeeModel.workplace_id == workplace_id,
+                EmployeeModel.is_active
+            )
+            .values(**employee_data.model_dump())
+        )
+        
+
+        await self.db.commit()
+        await self.db.refresh(employee, attribute_names=["user"])
+
+        logger.info("Сотрудник обновлен: employee_id=%s", employee.id)
+
+        return employee
