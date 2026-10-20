@@ -80,9 +80,11 @@ class WorkplaceCreate(WorkplaceBase):
 
 class WorkplaceResponse(WorkplaceBase):
     id: Annotated[int, Field(
+        ge=1,
         description="ID рабочего пространства"
     )]
     owner_id: Annotated[int, Field(
+        ge=1,
         description="ID владельца рабочего пространства"
     )]
 
