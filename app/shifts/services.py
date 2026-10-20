@@ -25,7 +25,7 @@ class ShiftServices:
         new_shift: ShiftCreate,
         workplace_id: int,
     ) -> ShiftResponse:
-        employee = self.db.scalar(
+        employee = await self.db.scalar(
             select(EmployeeModel)
             .where(
                 EmployeeModel.id == new_shift.employee_id,
