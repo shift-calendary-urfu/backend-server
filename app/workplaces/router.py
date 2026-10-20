@@ -43,6 +43,10 @@ async def create_workplace(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> WorkplaceModel:
+    """
+    Создание рабочего места.
+    Создать может авторизованный пользователь.
+    """
     try:
         services = WorkplaceServices(db)
         workplace = await services.create_workplace(workplace_data, owner=current_user)
@@ -62,6 +66,9 @@ async def get_all_workspaces_for_user(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """
+    Получение всех работающих мест для пользователя.
+    """
     services = WorkplaceServices(db)
     return await services.get_all_by_user(current_user)
 
@@ -74,6 +81,10 @@ async def get_workplace_by_id(
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_owner_or_employees),
 ):
+    """
+    Получить информацию о конкретном месте работы.
+    Работник или владелец могут получить доступ к этой информации.
+    """
     try:
         services = WorkplaceServices(db)
         return await services.get_by_id(workplace_id)
@@ -94,6 +105,10 @@ async def update_workplace(
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_current_owner),
 ):
+    """
+    Обновление данных по рабочей точки.
+    Тольок работодатель имеет право обновлять данные.
+    """
     try:
         services = WorkplaceServices(db)
         return await services.update_workplace(workplace_id, workplace_data)
@@ -113,6 +128,9 @@ async def delete_workplace(
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_current_owner),
 ):
+    """
+    Удаляет рабочее место вместе с работниками и расписанием.
+    """
     try:
         services = WorkplaceServices(db)
         await services.delete_workplace(workplace_id)
@@ -124,9 +142,6 @@ async def delete_workplace(
         )
 
 
-# ===========================
-# TODO: TEST THIS ENDPOINT!!!
-# ===========================
 @router.get(
     "/{workplace_id}/employees",
     response_model=list[EmployeeResponse]
@@ -136,6 +151,9 @@ async def get_employees_by_workplace(
     db: AsyncSession = Depends(get_db),
     _: UserModel = Depends(get_owner_or_employees),
 ):
+    """
+    Получает список сотрудников в указаном месте. 
+    """
     try:
         services = WorkplaceServices(db)
         return await services.get_employees_by_workplace(workplace_id)
