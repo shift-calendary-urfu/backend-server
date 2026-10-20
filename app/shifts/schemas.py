@@ -78,6 +78,10 @@ class ShiftResponse(ShiftBase, ShiftUserResponse):
         ge=1,
         description="ID смены"
     )]
+    workplace_id: Annotated[int, Field(
+        ge=1,
+        description="ID места работы"
+    )]
 
 
 class ShiftUpdate(BaseModel):
