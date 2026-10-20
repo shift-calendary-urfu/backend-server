@@ -70,3 +70,23 @@ class ShiftBase(BaseModel):
 
 class ShiftCreate(ShiftBase):
     pass
+
+
+class ShiftUserResponse(BaseModel):
+    first_name: Annotated[str, Field(
+        description="Имя работника"
+    )]
+    second_name: Annotated[str, Field(
+        description="Фамилия работника"
+    )]
+    third_name: Annotated[str | None, Field(
+        default=None,
+        description="Отчество работника"
+    )]
+
+
+class ShiftResponse(ShiftBase, ShiftUserResponse):
+    id: Annotated[int, Field(
+        ge=1,
+        description="ID смены"
+    )]
