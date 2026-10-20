@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, BeforeValidator
+from pydantic import BaseModel, Field, BeforeValidator, model_validator
 
 from typing import Annotated, Any
 
@@ -39,6 +39,33 @@ class ShiftBase(BaseModel):
         default=None,
         description ="Примечания"
     )]
+
+    @model_validator(mode="after")
+    def validate_time_step(self):
+        for field in ("start_time", "end_time"):
+            value = getattr(self, field)
+
+            if value.minute % 30 != 0:
+                raise ValueError(
+                    f"{field}: время должно быть кратно 30 минутам"
+                )
+
+        return self
+
+    @model_validator(mode='after')
+    def validate_shift_times(self):
+        start = self.start_time
+        end = self.end_time
+
+        if start.minute % 30 != 0 or end.minute % 30 != 0:
+            raise ValueError("Время должно быть кратно 30 минутам")
+
+        if end <= start:
+            raise ValueError(
+                "Время окончания смены должно быть строго позже времени начала"
+            )
+
+        return self
 
 
 class ShiftCreate(ShiftBase):
