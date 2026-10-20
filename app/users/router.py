@@ -25,6 +25,9 @@ router = APIRouter(
 async def get_info_user(
     current_user: UserModel = Depends(get_current_user)
 ):
+    """
+    Возвращает информацию о текущем пользователе.
+    """
     return current_user
 
 
@@ -38,6 +41,9 @@ async def update_info_user(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """
+    Обновляет данные пользователя.
+    """
     user_service = UserServices(db)
     updated_user = await user_service.update_user(new_data=new_data, user=current_user)
     return updated_user
@@ -50,6 +56,9 @@ async def update_password_user(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ) -> dict:
+    """
+    Обновление пароля.
+    """
     try:
         user_service = UserServices(db)
         await user_service.update_password(body.new_password, body.old_password, user=current_user)
