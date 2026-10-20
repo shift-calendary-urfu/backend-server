@@ -28,10 +28,12 @@ class ShiftBase(BaseModel):
         description='Дата смены'
     )]
     start_time: Annotated[TimeHHMM, Field(
-        description = 'Время начала смены'
+        description = 'Время начала смены',
+        json_schema_extra={"type": "string", "format": "time", "example": "8:00"}
     )]
     end_time: Annotated[TimeHHMM, Field(
-        description ='Конец времени смены'
+        description ='Конец времени смены',
+        json_schema_extra={"type": "string", "format": "time", "example": "21:00"}        
     )]
     notes: Annotated[str | None, Field(
         default=None,
