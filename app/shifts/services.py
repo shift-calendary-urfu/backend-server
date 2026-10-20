@@ -44,7 +44,10 @@ class ShiftServices:
                 "Employee not found or not active"
             )
 
-        shift = ShiftModel(**new_shift.model_dump(exclude_unset=True))
+        shift = ShiftModel(
+            workplace_id=workplace_id,
+            **new_shift.model_dump(exclude_unset=True)
+        )
 
         self.db.add(shift)
         await self.db.commit()
