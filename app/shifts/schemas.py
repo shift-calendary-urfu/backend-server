@@ -40,18 +40,6 @@ class ShiftBase(BaseModel):
         description ="Примечания"
     )]
 
-    @model_validator(mode="after")
-    def validate_time_step(self):
-        for field in ("start_time", "end_time"):
-            value = getattr(self, field)
-
-            if value.minute % 30 != 0:
-                raise ValueError(
-                    f"{field}: время должно быть кратно 30 минутам"
-                )
-
-        return self
-
     @model_validator(mode='after')
     def validate_shift_times(self):
         start = self.start_time
