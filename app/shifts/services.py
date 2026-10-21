@@ -10,7 +10,7 @@ from app.users.model import User as UserModel
 
 from app.core.logger import get_logger
 
-from app.exceptions import EmployeeNotFoundException
+from app.exceptions import EmployeeNotFoundException, ShiftNotFoundException
 
 
 logger=get_logger(__name__)
@@ -98,7 +98,8 @@ class ShiftServices:
             select(ShiftModel)
             .where(
                 ShiftModel.id == shift_id,
-                ShiftModel.workplace_id == workplace_id
+                ShiftModel.workplace_id == workplace_id,
+                ShiftModel.is_active
             )
         )
 
@@ -107,7 +108,7 @@ class ShiftServices:
                 "Смена не найдена, shift_id=%s", 
                 shift_id
             )
-            raise EmployeeNotFoundException(
+            raise ShiftNotFoundException(
                 "Shift not found"
             )
 
