@@ -32,10 +32,22 @@ class ShiftServices:
             )
             .join(EmployeeModel, EmployeeModel.id == ShiftModel.employee_id)
             .join(UserModel, UserModel.id == EmployeeModel.user_id)
-            .where(ShiftModel.id == shift_id)
+            .where(
+                ShiftModel.id == shift_id,
+                ShiftModel.is_active
+            )
         )
 
         shift, first_name, second_name, third_name = result.one()
+
+        if not shift:
+            logger.warning(
+                "Смена не найдена или не активна, shift_id=%s", 
+                shift_id
+            )
+            raise ShiftNotFoundException(
+                "Shift not found or not active"
+            )
 
         return ShiftResponse(
             id=shift.id,
@@ -49,6 +61,7 @@ class ShiftServices:
             second_name=second_name,
             third_name=third_name
         )
+    
 
     async def create_shift(
         self, 
@@ -86,7 +99,7 @@ class ShiftServices:
             "Смена создана успешно, shift_id=%s, workplace_id=%s", 
             shift.id, workplace_id
         )
-
+        
         return await self.get_shift_by_id(shift.id)
 
 
@@ -198,3 +211,36 @@ class ShiftServices:
             "Смены удалены успешно, date=%s, workplace_id=%s", 
             date, workplace_id
         )
+
+
+    # async def get_shift_by_id(
+    #     self, 
+    #     shift_id: int
+    # ) -> ShiftResponse:
+    #     result = await self.db.execute(
+    #         select(
+    #             ShiftModel,
+    #             UserModel.first_name,
+    #             UserModel.second_name,
+    #             UserModel.third_name,
+    #         )
+    #         .join(EmployeeModel, EmployeeModel.id == ShiftModel.employee_id)
+    #         .join(UserModel, UserModel.id == EmployeeModel.user_id)
+    #         .where(ShiftModel.id == shift_id)
+    #     )
+
+    #     shift, first_name, second_name, third_name = result.one()
+
+    #     return ShiftResponse(
+    #         id=shift.id,
+    #         employee_id=shift.employee_id,
+    #         workplace_id=shift.workplace_id,
+    #         date=shift.date,
+    #         start_time=shift.start_time,
+    #         end_time=shift.end_time,
+    #         notes=shift.notes,
+    #         first_name=first_name,
+    #         second_name=second_name,
+    #         third_name=third_name
+    #     )
+    # )
