@@ -11,7 +11,7 @@ from app.shifts.services import ShiftServices
 from app.users.model import User as UserModel
 
 from app.core.database import get_db
-from app.core.security import get_owner_or_admin
+from app.core.security import get_owner_or_admin, get_owner_or_employees
 
 from app.exceptions import EmployeeNotFoundException, ShiftNotFoundException
 
@@ -159,6 +159,41 @@ async def delete_shifts_by_date(
         shift_service = ShiftServices(db)
         await shift_service.delete_shifts_by_date(date, workplace_id)
         return {"message": f"Смены успешно удалены, дата {date}"}
+    except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
+
+
+@router.get(
+    "/{shift_id}",
+    response_model=ShiftResponse,
+)
+async def get_shift_by_id(
+    shift_id: Annotated[
+        int, 
+        Path(
+            ge=1, 
+            description="ID смены"
+        )
+    ],
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    db: AsyncSession = Depends(get_db),
+    _: UserModel = Depends(get_owner_or_employees)
+) -> ShiftResponse:
+    """
+    Получение информации о смене по её ID.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        return await shift_service.get_shift_by_id(shift_id, workplace_id)
     except ShiftNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
