@@ -88,3 +88,41 @@ async def update_shift(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg
         )
+
+
+
+@router.delete(
+    "/{shift_id}",
+    response_model=dict[str, str],
+)
+async def delete_shift_by_id(
+    shift_id: Annotated[
+        int, 
+        Path(
+            ge=1, 
+            description="ID смены"
+        )
+    ],
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    db: AsyncSession = Depends(get_db),
+    _: UserModel = Depends(get_owner_or_admin)
+) -> dict[str, str]:
+    """
+    Удаление смены по её ID.
+    Доступно только администратору и владельцу.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        await shift_service.delete_shift_by_id(shift_id, workplace_id)
+        return {"message": "Смена успешно удалена"}
+    except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
