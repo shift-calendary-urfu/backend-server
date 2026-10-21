@@ -131,7 +131,7 @@ async def delete_shift_by_id(
 
 
 @router.delete(
-    "",
+    "/",
     response_model=dict[str, str],
 )
 async def delete_shifts_by_date(
