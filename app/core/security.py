@@ -19,11 +19,15 @@ from app.users.model import User as UserModel
 from app.auth.schemas import RefreshTokenRequest
 
 from app.core.database import get_db
+from app.core.logger import get_logger
 
 from app.config import settings
 from app.exceptions import InvalidRefreshTokenException
 
 import jwt
+
+
+logger = get_logger(__name__)
 
 # Схема для проверки Bearer Tokens
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -183,9 +187,11 @@ async def get_current_user(
         email: str | None = payload.get("sub")
         token_type: str | None = payload.get("token_type")
         if email is None or token_type != TokenType.ACCESS.value:
+            logger.warning("Неверная подпись токена или повреждённый токен")
             raise credentials_exceptions
 
     except jwt.ExpiredSignatureError:
+        logger.warning("Срок действия токена истёк")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token expired",
@@ -193,6 +199,7 @@ async def get_current_user(
         )
     
     except jwt.PyJWTError:
+        logger.warning("Неверная подпись токена или повреждённый токен")
         raise credentials_exceptions
 
     user = await db.scalar(
@@ -220,6 +227,11 @@ async def get_owner_or_admin(
     )
 
     if is_owner is not None:
+        logger.info(
+            "Пользователь является владельцем рабочего пространства, user_id=%s, workplace_id=%s",
+            user.id,
+            workplace_id
+        )
         return user
 
     is_admin = await db.scalar(
@@ -232,8 +244,18 @@ async def get_owner_or_admin(
     )
 
     if is_admin is not None:
+        logger.info(
+            "Пользователь является администратором рабочего пространства, user_id=%s, workplace_id=%s",
+            user.id,
+            workplace_id
+        )
         return user
 
+    logger.info(
+        "Пользователь не является владельцем или администратором рабочего пространства, user_id=%s, workplace_id=%s",
+        user.id,
+        workplace_id
+    )
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You must be the owner or admin of this workplace",
@@ -253,8 +275,18 @@ async def get_current_owner(
     )
 
     if is_owner is not None:
+        logger.info(
+            "Пользователь является владельцем рабочего пространства, user_id=%s, workplace_id=%s",
+            user.id,
+            workplace_id
+        )
         return user
 
+    logger.info(
+        "Пользователь не является владельцем рабочего пространства, user_id=%s, workplace_id=%s",
+        user.id,
+        workplace_id
+    )
     raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You must be the owner of this workplace",
@@ -275,6 +307,11 @@ async def get_owner_or_employees(
     )
 
     if is_owner is not None:
+        logger.info(
+            "Пользователь является владельцем рабочего пространства, user_id=%s, workplace_id=%s",
+            user.id,
+            workplace_id
+        )
         return user
 
     is_employee = await db.scalar(
@@ -286,8 +323,18 @@ async def get_owner_or_employees(
     )
 
     if is_employee is not None:
+        logger.info(
+            "Пользователь является сотрудником рабочего пространства, user_id=%s, workplace_id=%s",
+            user.id,
+            workplace_id
+        )
         return user
 
+    logger.info(
+        "Пользователь не является владельцем или сотрудником рабочего пространства, user_id=%s, workplace_id=%s",
+        user.id,
+        workplace_id
+    )
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You must be the owner or employee of this workplace",
