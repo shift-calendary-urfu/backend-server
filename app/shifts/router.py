@@ -15,6 +15,8 @@ from app.core.security import get_owner_or_admin
 
 from app.exceptions import EmployeeNotFoundException, ShiftNotFoundException
 
+import datetime as dt
+
 
 router = APIRouter(
     prefix="/shifts",
@@ -121,6 +123,42 @@ async def delete_shift_by_id(
         shift_service = ShiftServices(db)
         await shift_service.delete_shift_by_id(shift_id, workplace_id)
         return {"message": "Смена успешно удалена"}
+    except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
+
+
+@router.delete(
+    "",
+    response_model=dict[str, str],
+)
+async def delete_shifts_by_date(
+    date: Annotated[
+        dt.date, 
+        Query(
+            description="Дата, смены которой будут удалены (в формате YYYY-MM-DD)"
+        )
+    ],
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    db: AsyncSession = Depends(get_db),
+    _: UserModel = Depends(get_owner_or_admin)
+) -> dict[str, str]:
+    """
+    Удаление всех смен в указанную дату.
+    Доступно только администратору и владельцу.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        await shift_service.delete_shifts_by_date(date, workplace_id)
+        return {"message": f"Смены успешно удалены, дата {date}"}
     except ShiftNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
