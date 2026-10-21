@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, BeforeValidator, model_validator
+from pydantic import BaseModel, Field, BeforeValidator, model_validator, ConfigDict
 
 from typing import Annotated, Any
 
