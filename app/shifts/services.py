@@ -22,7 +22,11 @@ class ShiftServices:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_shift_by_id(self, shift_id: int) -> ShiftResponse:
+    async def get_shift_by_id(
+        self, 
+        shift_id: int, 
+        workplace_id: int
+    ) -> ShiftResponse:
         result = await self.db.execute(
             select(
                 ShiftModel,
@@ -34,6 +38,7 @@ class ShiftServices:
             .join(UserModel, UserModel.id == EmployeeModel.user_id)
             .where(
                 ShiftModel.id == shift_id,
+                ShiftModel.workplace_id == workplace_id,
                 ShiftModel.is_active
             )
         )
@@ -100,7 +105,7 @@ class ShiftServices:
             shift.id, workplace_id
         )
         
-        return await self.get_shift_by_id(shift.id)
+        return await self.get_shift_by_id(shift.id, workplace_id)
 
 
     async def update_shift(
@@ -144,7 +149,7 @@ class ShiftServices:
             shift.id
         )
 
-        return await self.get_shift_by_id(shift.id)
+        return await self.get_shift_by_id(shift.id, workplace_id)
 
 
     async def delete_shift_by_id(
