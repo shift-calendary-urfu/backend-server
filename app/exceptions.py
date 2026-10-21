@@ -50,3 +50,9 @@ class EmployeeNotFoundException(Exception):
     def __init__(self, msg: str):
         self.msg = msg
         super().__init__(self.msg)
+
+
+class ShiftNotFoundException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
