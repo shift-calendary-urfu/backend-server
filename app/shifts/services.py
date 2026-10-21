@@ -218,34 +218,51 @@ class ShiftServices:
         )
 
 
-    # async def get_shift_by_id(
-    #     self, 
-    #     shift_id: int
-    # ) -> ShiftResponse:
-    #     result = await self.db.execute(
-    #         select(
-    #             ShiftModel,
-    #             UserModel.first_name,
-    #             UserModel.second_name,
-    #             UserModel.third_name,
-    #         )
-    #         .join(EmployeeModel, EmployeeModel.id == ShiftModel.employee_id)
-    #         .join(UserModel, UserModel.id == EmployeeModel.user_id)
-    #         .where(ShiftModel.id == shift_id)
-    #     )
+    async def get_shifts_by_date(
+        self,
+        date: dt.date,
+        workplace_id: int,
+    ) -> list[ShiftResponse]:
+        result = await self.db.execute(
+            select(
+                ShiftModel,
+                UserModel.first_name,
+                UserModel.second_name,
+                UserModel.third_name,
+            )
+            .join(EmployeeModel, EmployeeModel.id == ShiftModel.employee_id)
+            .join(UserModel, UserModel.id == EmployeeModel.user_id)
+            .where(
+                ShiftModel.date == date,
+                ShiftModel.workplace_id == workplace_id,
+                ShiftModel.is_active
+            )
+        )
 
-    #     shift, first_name, second_name, third_name = result.one()
+        shifts = result.all()
 
-    #     return ShiftResponse(
-    #         id=shift.id,
-    #         employee_id=shift.employee_id,
-    #         workplace_id=shift.workplace_id,
-    #         date=shift.date,
-    #         start_time=shift.start_time,
-    #         end_time=shift.end_time,
-    #         notes=shift.notes,
-    #         first_name=first_name,
-    #         second_name=second_name,
-    #         third_name=third_name
-    #     )
-    # )
+        if not shifts:
+            logger.warning(
+                "Смены не найдены или не активны, date=%s, workplace_id=%s", 
+                date, workplace_id
+            )
+            raise ShiftNotFoundException(
+                f"Shifts not found or not active on this date={date}"
+            )
+
+        return [
+            ShiftResponse(
+                id=shift.id,
+                workplace_id=shift.workplace_id,
+                employee_id=shift.employee_id,
+                date=shift.date,
+                start_time=shift.start_time,
+                end_time=shift.end_time,
+                notes=shift.notes,
+                first_name=first_name,
+                second_name=second_name,
+                third_name=third_name,
+            )
+            for shift, first_name, second_name, third_name in shifts
+        ]
+        

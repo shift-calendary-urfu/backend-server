@@ -199,3 +199,43 @@ async def get_shift_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg
         )
+
+
+@router.get(
+    "/",
+    response_model=list[ShiftResponse],
+)
+async def get_shifts_by_date(
+    date: Annotated[
+        dt.date, 
+        Query(
+            description="Дата, смены которой будут получены (в формате YYYY-MM-DD)"
+        )
+    ],
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    db: Annotated[
+        AsyncSession, 
+        Depends(get_db)
+    ],
+    _: Annotated[
+        UserModel, 
+        Depends(get_owner_or_employees)
+    ]
+) -> list[ShiftResponse]:
+    """
+    Получение всех смен в указанную дату.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        return await shift_service.get_shifts_by_date(date, workplace_id)
+    except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
