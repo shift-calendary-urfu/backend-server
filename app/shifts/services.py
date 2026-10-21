@@ -12,6 +12,8 @@ from app.core.logger import get_logger
 
 from app.exceptions import EmployeeNotFoundException, ShiftNotFoundException
 
+import datetime as dt
+
 
 logger=get_logger(__name__)
 
@@ -162,4 +164,36 @@ class ShiftServices:
         logger.info(
             "Смена удалена успешно, shift_id=%s", 
             shift.id
+        )
+
+
+    async def delete_shifts_by_date(
+        self,
+        date: dt.date,
+        workplace_id: int,
+    ) -> None:
+        async with self.db.begin():
+            result = await self.db.execute(
+                update(ShiftModel)
+                .where(
+                    ShiftModel.date == date,
+                    ShiftModel.workplace_id == workplace_id,
+                    ShiftModel.is_active.is_(True),
+                )
+                .values(is_active=False)
+                .returning(ShiftModel.id)
+            )
+
+            if not result.scalars().all():
+                logger.warning(
+                    "Смены не найдены или не активны, date=%s, workplace_id=%s", 
+                    date, workplace_id
+                )
+                raise ShiftNotFoundException(
+                    f"Shifts not found or not active on this date={date}"
+                )
+        
+        logger.info(
+            "Смены удалены успешно, date=%s, workplace_id=%s", 
+            date, workplace_id
         )
