@@ -152,7 +152,7 @@ async def delete_shifts_by_date(
     _: UserModel = Depends(get_owner_or_admin)
 ) -> dict[str, str]:
     """
-    Удаление всех смен, начиная с указанной даты.
+    Удаление всех смен в указанную дату.
     Доступно только администратору и владельцу.
     """
     try:
