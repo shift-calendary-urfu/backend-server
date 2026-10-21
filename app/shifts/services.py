@@ -105,11 +105,11 @@ class ShiftServices:
 
         if not shift:
             logger.warning(
-                "Смена не найдена, shift_id=%s", 
+                "Смена не найдена или не активна, shift_id=%s", 
                 shift_id
             )
             raise ShiftNotFoundException(
-                "Shift not found"
+                "Shift not found or not active"
             )
 
         await self.db.execute(
@@ -130,3 +130,36 @@ class ShiftServices:
         )
 
         return await self.get_shift_by_id(shift.id)
+
+
+    async def delete_shift_by_id(
+        self,
+        shift_id: int,
+        workplace_id: int
+    ) -> None:
+        shift = await self.db.scalar(
+            select(ShiftModel)
+            .where(
+                ShiftModel.id == shift_id,
+                ShiftModel.workplace_id == workplace_id,
+                ShiftModel.is_active
+            )
+        )
+
+        if not shift:
+            logger.warning(
+                "Смена не найдена или не активна, shift_id=%s", 
+                shift_id
+            )
+            raise ShiftNotFoundException(
+                "Shift not found or not active"
+            )
+
+        shift.is_active = False
+
+        await self.db.commit()
+
+        logger.info(
+            "Смена удалена успешно, shift_id=%s", 
+            shift.id
+        )
