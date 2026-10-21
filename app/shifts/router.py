@@ -230,6 +230,7 @@ async def get_shifts_by_date(
 ) -> list[ShiftResponse]:
     """
     Получение всех смен в указанную дату.
+    Получение доступно владельцу и сотрудникам рабочего пространства.
     """
     try:
         shift_service = ShiftServices(db)
