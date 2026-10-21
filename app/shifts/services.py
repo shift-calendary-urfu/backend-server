@@ -172,26 +172,27 @@ class ShiftServices:
         date: dt.date,
         workplace_id: int,
     ) -> None:
-        async with self.db.begin():
-            result = await self.db.execute(
-                update(ShiftModel)
-                .where(
-                    ShiftModel.date == date,
-                    ShiftModel.workplace_id == workplace_id,
-                    ShiftModel.is_active.is_(True),
-                )
-                .values(is_active=False)
-                .returning(ShiftModel.id)
+        result = await self.db.execute(
+            update(ShiftModel)
+            .where(
+                ShiftModel.date == date,
+                ShiftModel.workplace_id == workplace_id,
+                ShiftModel.is_active,
+            )
+            .values(is_active=False)
+            .returning(ShiftModel.id)
+        )
+
+        if not result.scalars().all():
+            logger.warning(
+                "Смены не найдены или не активны, date=%s, workplace_id=%s", 
+                date, workplace_id
+            )
+            raise ShiftNotFoundException(
+                f"Shifts not found or not active on this date={date}"
             )
 
-            if not result.scalars().all():
-                logger.warning(
-                    "Смены не найдены или не активны, date=%s, workplace_id=%s", 
-                    date, workplace_id
-                )
-                raise ShiftNotFoundException(
-                    f"Shifts not found or not active on this date={date}"
-                )
+        await self.db.commit()
         
         logger.info(
             "Смены удалены успешно, date=%s, workplace_id=%s", 
