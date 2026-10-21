@@ -40,18 +40,6 @@ class ShiftBase(BaseModel):
         description ="Примечания"
     )]
 
-    @model_validator(mode="after")
-    def validate_time_step(self):
-        for field in ("start_time", "end_time"):
-            value = getattr(self, field)
-
-            if value.minute % 30 != 0:
-                raise ValueError(
-                    f"{field}: время должно быть кратно 30 минутам"
-                )
-
-        return self
-
     @model_validator(mode='after')
     def validate_shift_times(self):
         start = self.start_time
@@ -90,3 +78,33 @@ class ShiftResponse(ShiftBase, ShiftUserResponse):
         ge=1,
         description="ID смены"
     )]
+    workplace_id: Annotated[int, Field(
+        ge=1,
+        description="ID места работы"
+    )]
+
+
+class ShiftUpdate(BaseModel):
+    start_time: Annotated[TimeHHMM, Field(
+            description = 'Время начала смены',
+            json_schema_extra={"type": "string", "format": "time", "example": "8:00"}
+        )]
+    end_time: Annotated[TimeHHMM, Field(
+        description ='Конец времени смены',
+        json_schema_extra={"type": "string", "format": "time", "example": "21:00"}        
+    )]
+
+    @model_validator(mode='after')
+    def validate_shift_times(self):
+        start = self.start_time
+        end = self.end_time
+
+        if start.minute % 30 != 0 or end.minute % 30 != 0:
+            raise ValueError("Время должно быть кратно 30 минутам")
+
+        if end <= start:
+            raise ValueError(
+                "Время окончания смены должно быть строго позже времени начала"
+            )
+
+        return self

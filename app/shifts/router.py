@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from typing import Annotated
 
-from app.shifts.schemas import ShiftCreate, ShiftResponse
+from app.shifts.schemas import ShiftCreate, ShiftResponse, ShiftUpdate
 from app.shifts.model import Shift as ShiftModel
 from app.shifts.services import ShiftServices
 
@@ -13,7 +13,7 @@ from app.users.model import User as UserModel
 from app.core.database import get_db
 from app.core.security import get_owner_or_admin
 
-from app.exceptions import EmployeeNotFoundException
+from app.exceptions import EmployeeNotFoundException, ShiftNotFoundException
 
 
 router = APIRouter(
@@ -51,4 +51,40 @@ async def create_shift(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg
         )
-        
+
+
+@router.put(
+    "/{shift_id}",
+    response_model=ShiftResponse,
+)
+async def update_shift(
+    shift_id: Annotated[
+        int, 
+        Path(
+            ge=1, 
+            description="ID смены"
+        )
+    ],
+    updated_data : ShiftUpdate,
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    db: AsyncSession = Depends(get_db),
+    _: UserModel = Depends(get_owner_or_admin)
+) -> ShiftResponse:
+    """
+    Обновление информации о смене по её ID.
+    Доступно только администратору и владельцу.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        return await shift_service.update_shift(shift_id, workplace_id, updated_data)
+    except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
