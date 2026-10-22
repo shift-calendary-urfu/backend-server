@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
-from app.shifts.schemas import ShiftCreate, ShiftResponse, ShiftUpdate
+from app.shifts.schemas import ShiftCreate, ShiftResponse, ShiftUpdate, CalendarResponse
 from app.shifts.model import Shift as ShiftModel
 
 from app.employees.model import Employee as EmployeeModel
@@ -272,7 +272,7 @@ class ShiftServices:
         date_from: dt.date,
         date_to: dt.date,
         workplace_id: int,
-    ) -> dict[dt.date, list[ShiftResponse]]:
+    ) -> CalendarResponse:
         result = await self.db.execute(
             select(
                 ShiftModel,
@@ -324,4 +324,4 @@ class ShiftServices:
             date_from, date_to, workplace_id
         )
 
-        return shifts_by_date
+        return CalendarResponse(root=shifts_by_date)
