@@ -142,13 +142,13 @@ class CalendarResponse(RootModel[dict[dt.date, list[ShiftResponse]]]):
     )
 
 
-class ShiftsDublicate(BaseModel):
+class ShiftsDuplicate(BaseModel):
     dates: Annotated[list[dt.date], Field(
-        default_factory=list,
+        min_length=1,
         description="Список дат, на которые нужно размножить смены"
     )]
     shift_ids: Annotated[list[int], Field(
-        default_factory=list,
+        min_length=1,
         description="Список ID смен, которые нужно размножить"
     )]
 
@@ -162,3 +162,26 @@ class ShiftsDublicate(BaseModel):
             ]
         }
     )
+
+
+class ShiftsDuplicateResponse(BaseModel):
+    count_duplicated_shifts_created: Annotated[int, Field(
+        ge=0,
+        description="Количество успешно созданных дубликатов смен"
+    )]
+    workplace_id: Annotated[int, Field(
+        ge=1,
+        description="ID рабочего пространства, в котором были созданы дубликаты смен"
+    )]
+    period: Annotated[dict[str, dt.date], Field(
+        description="Период, на который были созданы дубликаты смен",
+        json_schema_extra={
+            "example": {
+                "start_date": "2026-10-22",
+                "end_date": "2026-10-23"
+            }
+        }
+    )]
+    message: Annotated[str, Field(
+        description="Сообщения о процессе создания дубликатов смен"
+    )]
