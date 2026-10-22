@@ -1,4 +1,11 @@
-from pydantic import BaseModel, Field, BeforeValidator, model_validator, ConfigDict
+from pydantic import (
+    BaseModel, 
+    Field, 
+    ConfigDict,
+    BeforeValidator, 
+    model_validator, 
+    RootModel
+)
 
 from typing import Annotated, Any
 
@@ -108,3 +115,28 @@ class ShiftUpdate(BaseModel):
             )
 
         return self
+
+
+class CalendarResponse(RootModel[dict[dt.date, list[ShiftResponse]]]):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "2026-10-22": [
+                        {
+                            "first_name": "Иван",
+                            "second_name": "Иванов",
+                            "third_name": None,
+                            "employee_id": 1,
+                            "date": "2026-10-22",
+                            "start_time": "08:00",
+                            "end_time": "21:00",
+                            "notes": None,
+                            "id": 1,
+                            "workplace_id": 1,
+                        }
+                    ]
+                }
+            ]
+        }
+    )
