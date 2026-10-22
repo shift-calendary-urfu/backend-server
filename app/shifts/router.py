@@ -4,7 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from typing import Annotated
 
-from app.shifts.schemas import ShiftCreate, ShiftResponse, ShiftUpdate, CalendarResponse
+from app.shifts.schemas import (
+    ShiftCreate, 
+    ShiftResponse,
+    ShiftUpdate, 
+    CalendarResponse, 
+    ShiftsDuplicate, 
+    ShiftsDuplicateResponse
+)
 from app.shifts.services import ShiftServices
 
 from app.users.model import User as UserModel
@@ -281,6 +288,42 @@ async def get_calendar_shifts(
     try:
         shift_service = ShiftServices(db)
         return await shift_service.get_calendar_shifts(date_from, date_to, workplace_id)
+    except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
+
+
+@router.post(
+    "/duplicate/",
+    response_model=ShiftsDuplicateResponse,
+)
+async def duplicate_shifts(
+    duplicate_data: ShiftsDuplicate,
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    db: Annotated[
+        AsyncSession, 
+        Depends(get_db)
+    ],
+    _: Annotated[
+        UserModel, 
+        Depends(get_owner_or_admin)
+    ]
+) -> ShiftsDuplicateResponse:
+    """
+    Размножение смен на указанные даты.
+    Доступно только администратору и владельцу.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        return await shift_service.duplicate_shifts(duplicate_data, workplace_id)
     except ShiftNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
