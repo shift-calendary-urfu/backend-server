@@ -266,3 +266,62 @@ class ShiftServices:
             for shift, first_name, second_name, third_name in shifts
         ]
         
+
+    async def get_calendar_shifts(
+        self,
+        date_from: dt.date,
+        date_to: dt.date,
+        workplace_id: int,
+    ) -> dict[dt.date, list[ShiftResponse]]:
+        result = await self.db.execute(
+            select(
+                ShiftModel,
+                UserModel.first_name,
+                UserModel.second_name,
+                UserModel.third_name,
+            )
+            .join(EmployeeModel, EmployeeModel.id == ShiftModel.employee_id)
+            .join(UserModel, UserModel.id == EmployeeModel.user_id)
+            .where(
+                ShiftModel.date >= date_from,
+                ShiftModel.date <= date_to,
+                ShiftModel.workplace_id == workplace_id,
+                ShiftModel.is_active
+            )
+            .order_by(ShiftModel.date)
+        )
+
+        shifts = result.all()
+
+        if not shifts:
+            logger.warning(
+                "Смены не найдены или не активны, start_date=%s, end_date=%s, workplace_id=%s", 
+                date_from, date_to, workplace_id
+            )
+            raise ShiftNotFoundException(
+                f"Shifts not found or not active between {date_from} and {date_to}"
+            )
+
+        shifts_by_date: dict[dt.date, list[ShiftResponse]] = {}
+        for shift, first_name, second_name, third_name in shifts:
+            shift_response = ShiftResponse(
+                id=shift.id,
+                workplace_id=shift.workplace_id,
+                employee_id=shift.employee_id,
+                date=shift.date,
+                start_time=shift.start_time,
+                end_time=shift.end_time,
+                notes=shift.notes,
+                first_name=first_name,
+                second_name=second_name,
+                third_name=third_name,
+            )
+
+            shifts_by_date.setdefault(shift.date, []).append(shift_response)
+
+        logger.info(
+            "Смены получены успешно, start_date=%s, end_date=%s, workplace_id=%s", 
+            date_from, date_to, workplace_id
+        )
+
+        return shifts_by_date
