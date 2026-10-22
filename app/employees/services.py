@@ -112,6 +112,7 @@ class EmployeeServices:
 
         new_employee = EmployeeModel(
             user_id=user.id,
+            workplace_id=workplace_id,
             **employee_data.model_dump(exclude={"phone"})
         )
 
