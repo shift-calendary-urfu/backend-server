@@ -240,3 +240,50 @@ async def get_shifts_by_date(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg
         )
+
+
+@router.get(
+    '/calendar/',
+    response_model=dict[dt.date, list[ShiftResponse]],
+)
+async def get_calendar_shifts(
+    date_from: Annotated[
+        dt.date, 
+        Query(
+            description="Дата начала периода (в формате YYYY-MM-DD)"
+        )
+    ],
+    date_to: Annotated[
+        dt.date, 
+        Query(
+            description="Дата окончания периода (в формате YYYY-MM-DD)"
+        )
+    ],
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    db: Annotated[
+        AsyncSession, 
+        Depends(get_db)
+    ],
+    _: Annotated[
+        UserModel, 
+        Depends(get_owner_or_employees)
+    ]
+) -> dict[dt.date, list[ShiftResponse]]:
+    """
+    Получение всех смен в указанном периоде.
+    Получение доступно владельцу и сотрудникам рабочего пространства.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        return await shift_service.get_calendar_shifts(date_from, date_to, workplace_id)
+    except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
