@@ -140,3 +140,25 @@ class CalendarResponse(RootModel[dict[dt.date, list[ShiftResponse]]]):
             ]
         }
     )
+
+
+class ShiftsDublicate(BaseModel):
+    dates: Annotated[list[dt.date], Field(
+        default_factory=list,
+        description="Список дат, на которые нужно размножить смены"
+    )]
+    shift_ids: Annotated[list[int], Field(
+        default_factory=list,
+        description="Список ID смен, которые нужно размножить"
+    )]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "dates": ["2026-10-22", "2026-10-23"],
+                    "shift_ids": [1, 2, 3]
+                }
+            ]
+        }
+    )
