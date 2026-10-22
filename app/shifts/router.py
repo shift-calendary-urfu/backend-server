@@ -4,8 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from typing import Annotated
 
-from app.shifts.schemas import ShiftCreate, ShiftResponse, ShiftUpdate
-from app.shifts.model import Shift as ShiftModel
+from app.shifts.schemas import ShiftCreate, ShiftResponse, ShiftUpdate, CalendarResponse
 from app.shifts.services import ShiftServices
 
 from app.users.model import User as UserModel
@@ -244,7 +243,7 @@ async def get_shifts_by_date(
 
 @router.get(
     '/calendar/',
-    response_model=dict[dt.date, list[ShiftResponse]],
+    response_model=CalendarResponse,
 )
 async def get_calendar_shifts(
     date_from: Annotated[
@@ -274,7 +273,7 @@ async def get_calendar_shifts(
         UserModel, 
         Depends(get_owner_or_employees)
     ]
-) -> dict[dt.date, list[ShiftResponse]]:
+) -> CalendarResponse:
     """
     Получение всех смен в указанном периоде.
     Получение доступно владельцу и сотрудникам рабочего пространства.
