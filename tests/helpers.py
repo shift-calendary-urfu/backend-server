@@ -101,6 +101,63 @@ async def create_workplace(client, headers, **overrides) -> dict:
     return response.json()
 
 
+def employee_payload(phone: str, **overrides) -> dict:
+    payload = {
+        "phone": phone,
+        "role": "employee",
+        "position": "Кассир",
+    }
+    payload.update(overrides)
+    return payload
+
+
+async def create_employee(
+    client,
+    headers,
+    workplace_id: int,
+    phone: str,
+    **overrides,
+) -> dict:
+    response = await client.post(
+        "/employees/",
+        params={"workplace_id": workplace_id},
+        json=employee_payload(phone, **overrides),
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def shift_payload(employee_id: int, **overrides) -> dict:
+    payload = {
+        "employee_id": employee_id,
+        "date": "2026-11-02",
+        "start_time": "09:00",
+        "end_time": "18:00",
+    }
+    payload.update(overrides)
+    if isinstance(payload.get("date"), date):
+        payload["date"] = payload["date"].isoformat()
+    return payload
+
+
+async def create_shift(
+    client,
+    headers,
+    workplace_id: int,
+    employee_id: int,
+    **overrides,
+) -> dict:
+    response = await client.post(
+        "/shifts/",
+        params={"workplace_id": workplace_id},
+        json=shift_payload(employee_id, **overrides),
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 async def add_employee(
     session_factory,
     *,
