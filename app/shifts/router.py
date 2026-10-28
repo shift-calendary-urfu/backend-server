@@ -10,7 +10,8 @@ from app.shifts.schemas import (
     ShiftUpdate, 
     CalendarResponse, 
     ShiftsDuplicate, 
-    ShiftsDuplicateResponse
+    ShiftsDuplicateResponse,
+    CalendarReportResponse
 )
 from app.shifts.services import ShiftServices
 
@@ -19,7 +20,12 @@ from app.users.model import User as UserModel
 from app.core.database import get_db
 from app.core.security import get_owner_or_admin, get_owner_or_employees
 
-from app.exceptions import EmployeeNotFoundException, ShiftNotFoundException
+from app.exceptions import (
+    EmployeeNotFoundException,
+    ShiftNotFoundException,
+    WorkplaceNotFoundException,
+    InvalidReportPeriodException
+)
 
 import datetime as dt
 
@@ -325,6 +331,60 @@ async def duplicate_shifts(
         shift_service = ShiftServices(db)
         return await shift_service.duplicate_shifts(duplicate_data, workplace_id)
     except ShiftNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
+
+
+@router.get(
+    "/reports/calendar",
+    response_model=CalendarReportResponse,
+)
+async def get_calendar_report(
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    month: Annotated[
+        int, 
+        Query(
+            description="Месяц отчёта (1–12)"
+        )
+    ],
+    year: Annotated[
+        int, 
+        Query(
+            description="Год отчёта (например, 2026)"
+        )
+    ],
+    db: Annotated[
+        AsyncSession, 
+        Depends(get_db)
+    ],
+    _: Annotated[
+        UserModel, 
+        Depends(get_owner_or_admin)
+    ]
+) -> CalendarReportResponse:
+    """
+    Отчёт по рабочей точке за месяц: период, общее количество часов и смен,
+    а для каждого работника — отработанные часы, количество полных смен
+    и часы полных смен.
+    Доступно только администратору и владельцу.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        return await shift_service.get_calendar_report(workplace_id, month, year)
+    except InvalidReportPeriodException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.msg
+        )
+    except WorkplaceNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg

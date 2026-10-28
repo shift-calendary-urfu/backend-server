@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select, update
 
 from app.shifts.schemas import (
@@ -7,7 +8,9 @@ from app.shifts.schemas import (
     ShiftUpdate, 
     CalendarResponse, 
     ShiftsDuplicate,
-    ShiftsDuplicateResponse
+    ShiftsDuplicateResponse,
+    CalendarReportResponse,
+    EmployeeReportItem
 )
 from app.shifts.model import Shift as ShiftModel
 
@@ -15,14 +18,64 @@ from app.employees.model import Employee as EmployeeModel
 
 from app.users.model import User as UserModel
 
+from app.workplaces.model import Workplace as WorkplaceModel
+
 from app.core.logger import get_logger
 
-from app.exceptions import EmployeeNotFoundException, ShiftNotFoundException
+from app.exceptions import (
+    EmployeeNotFoundException,
+    ShiftNotFoundException,
+    WorkplaceNotFoundException,
+    InvalidReportPeriodException
+)
 
+import calendar
 import datetime as dt
 
 
 logger=get_logger(__name__)
+
+
+# ----- Константы и вспомогательные функции для отчёта -----
+MINUTES_IN_DAY = 24 * 60
+
+# Допустимый диапазон лет для отчёта
+MIN_REPORT_YEAR = 2000
+MAX_REPORT_YEAR = 2100
+
+
+def _to_minutes(value: dt.time) -> int:
+    """
+    Переводит время в количество минут от начала суток.
+    """
+    return value.hour * 60 + value.minute
+
+
+def _shift_bounds(start_time: dt.time, end_time: dt.time) -> tuple[int, int]:
+    """
+    Возвращает начало и конец смены в минутах от начала дня смены.
+    Сейчас API не даёт создать смену, где конец раньше начала,
+    но если такие смены появятся (через полночь, 22:00–06:00),
+    конец переносится на следующие сутки и часы не уходят в минус.
+    """
+    start = _to_minutes(start_time)
+    end = _to_minutes(end_time)
+
+    if end <= start:
+        end += MINUTES_IN_DAY
+
+    return start, end
+
+
+def _minutes_to_hours(minutes: int) -> float:
+    return round(minutes / 60, 2)
+
+
+def _full_name(employee: EmployeeModel) -> str:
+    user = employee.user
+    parts = [user.second_name, user.first_name, user.third_name]
+    return " ".join(part for part in parts if part)
+# ----------------------------------------------------------
 
 
 class ShiftServices:
@@ -403,3 +456,144 @@ class ShiftServices:
                 f"с {start_date} по {end_date}"
             ),
         )
+
+
+    async def get_calendar_report(
+        self,
+        workplace_id: int,
+        month: int,
+        year: int,
+    ) -> CalendarReportResponse:
+        """
+        Составляет отчёт по рабочей точке за месяц.
+
+        Учитываются активные смены, отменённые (status='cancelled') не учитываются
+        (план = факт, см. docs/backend-endpoints-spec.md).
+
+        Полная смена — смена, которая покрывает весь график точки
+        (начинается не позже открытия и заканчивается не раньше закрытия).
+        Если смена длиннее графика, она считается полной, а в часы идёт её фактическая длительность.
+        """
+        logger.info(
+            "Составление отчёта: workplace_id=%s, month=%s, year=%s",
+            workplace_id, month, year
+        )
+
+        if not 1 <= month <= 12:
+            logger.warning("Некорректный месяц для отчёта: month=%s", month)
+            raise InvalidReportPeriodException(
+                "Month must be between 1 and 12"
+            )
+
+        if not MIN_REPORT_YEAR <= year <= MAX_REPORT_YEAR:
+            logger.warning("Некорректный год для отчёта: year=%s", year)
+            raise InvalidReportPeriodException(
+                f"Year must be between {MIN_REPORT_YEAR} and {MAX_REPORT_YEAR}"
+            )
+
+        workplace = await self.db.scalar(
+            select(WorkplaceModel)
+            .where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active
+            )
+        )
+
+        if workplace is None:
+            logger.warning(
+                "Рабочая точка для отчёта не найдена или не активна, workplace_id=%s",
+                workplace_id
+            )
+            raise WorkplaceNotFoundException(
+                "Workplace not found"
+            )
+
+        period_start = dt.date(year, month, 1)
+        period_end = dt.date(year, month, calendar.monthrange(year, month)[1])
+
+        shifts = (await self.db.scalars(
+            select(ShiftModel)
+            .options(
+                selectinload(ShiftModel.employee)
+                .selectinload(EmployeeModel.user)
+            )
+            .where(
+                ShiftModel.workplace_id == workplace_id,
+                ShiftModel.date >= period_start,
+                ShiftModel.date <= period_end,
+                ShiftModel.status != "cancelled",
+                ShiftModel.is_active,
+            )
+        )).all()
+
+        # Активные работники точки попадают в отчёт, даже если у них нет смен за месяц
+        active_employees = (await self.db.scalars(
+            select(EmployeeModel)
+            .options(selectinload(EmployeeModel.user))
+            .where(
+                EmployeeModel.workplace_id == workplace_id,
+                EmployeeModel.is_active
+            )
+        )).all()
+
+        workplace_start = _to_minutes(workplace.work_start_time)
+        workplace_end = _to_minutes(workplace.work_end_time)
+
+        stats: dict[int, dict] = {}
+
+        def get_employee_stats(employee: EmployeeModel) -> dict:
+            if employee.id not in stats:
+                stats[employee.id] = {
+                    "employee": employee,
+                    "minutes_worked": 0,
+                    "full_shifts_count": 0,
+                    "full_shifts_minutes": 0,
+                }
+            return stats[employee.id]
+
+        for employee in active_employees:
+            get_employee_stats(employee)
+
+        total_minutes = 0
+
+        for shift in shifts:
+            # Работник мог быть уволен после смены — его смены за месяц всё равно учитываются
+            employee_stats = get_employee_stats(shift.employee)
+
+            start, end = _shift_bounds(shift.start_time, shift.end_time)
+            duration = end - start
+
+            employee_stats["minutes_worked"] += duration
+            total_minutes += duration
+
+            if start <= workplace_start and end >= workplace_end:
+                employee_stats["full_shifts_count"] += 1
+                employee_stats["full_shifts_minutes"] += duration
+
+        employees_report = [
+            EmployeeReportItem(
+                employee_id=employee_id,
+                full_name=_full_name(item["employee"]),
+                hours_worked=_minutes_to_hours(item["minutes_worked"]),
+                full_shifts_count=item["full_shifts_count"],
+                full_shifts_hours=_minutes_to_hours(item["full_shifts_minutes"]),
+            )
+            for employee_id, item in stats.items()
+        ]
+        employees_report.sort(key=lambda item: (item.full_name, item.employee_id))
+
+        report = CalendarReportResponse(
+            workplace_id=workplace_id,
+            period=f"{year:04d}-{month:02d}",
+            total_hours=_minutes_to_hours(total_minutes),
+            total_shifts=len(shifts),
+            employees=employees_report,
+        )
+
+        logger.info(
+            "Отчёт составлен успешно, workplace_id=%s, period=%s, смен=%s, часов=%s, работников=%s",
+            workplace_id, report.period, report.total_shifts,
+            report.total_hours, len(employees_report)
+        )
+
+        return report
