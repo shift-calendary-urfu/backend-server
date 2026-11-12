@@ -21,6 +21,13 @@ from app.users.model import User as UserModel
 from app.workplaces.model import Workplace as WorkplaceModel
 
 from app.core.logger import get_logger
+from app.core.excel_report import (
+    ColumnType,
+    ExcelColumn,
+    ExcelFile,
+    ExcelSheet,
+    build_excel_report_async,
+)
 
 from app.exceptions import (
     EmployeeNotFoundException,
@@ -75,6 +82,71 @@ def _full_name(employee: EmployeeModel) -> str:
     user = employee.user
     parts = [user.second_name, user.first_name, user.third_name]
     return " ".join(part for part in parts if part)
+
+
+MONTH_NAMES = (
+    "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+)
+
+
+def build_calendar_report_sheets(
+    report: CalendarReportResponse,
+    workplace_name: str,
+    workplace_address: str | None,
+    work_start_time: dt.time,
+    work_end_time: dt.time,
+) -> list[ExcelSheet]:
+    """
+    Превращает отчёт за месяц (get_calendar_report) в лист Excel.
+    Возвращает только простые значения, чтобы файл можно было
+    безопасно собирать в отдельном потоке.
+    """
+    year, month = (int(part) for part in report.period.split("-"))
+
+    rows = [
+        [
+            number,
+            item.full_name,
+            item.hours_worked,
+            item.full_shifts_count,
+            item.full_shifts_hours,
+        ]
+        for number, item in enumerate(report.employees, start=1)
+    ]
+
+    total_full_shifts = sum(item.full_shifts_count for item in report.employees)
+    total_full_hours = round(
+        sum(item.full_shifts_hours for item in report.employees), 2
+    )
+
+    sheet = ExcelSheet(
+        title="Отчёт",
+        header_lines=[
+            f"Отчёт по сменам: {workplace_name}",
+            f"Адрес: {workplace_address or '—'}",
+            f"Период: {MONTH_NAMES[month - 1]} {year}",
+            f"Режим работы точки: {work_start_time:%H:%M}–{work_end_time:%H:%M}",
+            f"Всего смен за месяц: {report.total_shifts}",
+        ],
+        columns=[
+            ExcelColumn("№", ColumnType.INTEGER, width=6),
+            ExcelColumn("Сотрудник", width=36),
+            ExcelColumn("Отработано часов", ColumnType.NUMBER, width=14),
+            ExcelColumn("Полных смен", ColumnType.INTEGER, width=12),
+            ExcelColumn("Часов в полных сменах", ColumnType.NUMBER, width=16),
+        ],
+        rows=rows,
+        totals=[
+            None,
+            "Итого",
+            report.total_hours,
+            total_full_shifts,
+            total_full_hours,
+        ],
+    )
+
+    return [sheet]
 # ----------------------------------------------------------
 
 
@@ -597,3 +669,62 @@ class ShiftServices:
         )
 
         return report
+
+
+    async def get_calendar_report_excel(
+        self,
+        workplace_id: int,
+        month: int,
+        year: int,
+    ) -> ExcelFile:
+        """
+        Отчёт по рабочей точке за месяц в виде Excel-файла (.xlsx).
+
+        Данные берутся из get_calendar_report, поэтому цифры в файле
+        всегда совпадают с JSON-отчётом. Сам файл собирается в отдельном
+        потоке (build_excel_report_async) и не блокирует сервер.
+        """
+        # Проверяет месяц, год и точку; при ошибке выбрасывает исключение
+        report = await self.get_calendar_report(workplace_id, month, year)
+
+        workplace = (await self.db.execute(
+            select(
+                WorkplaceModel.name,
+                WorkplaceModel.address,
+                WorkplaceModel.work_start_time,
+                WorkplaceModel.work_end_time,
+            )
+            .where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active
+            )
+        )).one_or_none()
+
+        if workplace is None:
+            logger.warning(
+                "Рабочая точка для Excel-отчёта не найдена или не активна, workplace_id=%s",
+                workplace_id
+            )
+            raise WorkplaceNotFoundException(
+                "Workplace not found"
+            )
+
+        sheets = build_calendar_report_sheets(
+            report=report,
+            workplace_name=workplace.name,
+            workplace_address=workplace.address,
+            work_start_time=workplace.work_start_time,
+            work_end_time=workplace.work_end_time,
+        )
+
+        content = await build_excel_report_async(sheets)
+
+        logger.info(
+            "Excel-отчёт сформирован, workplace_id=%s, period=%s, размер=%s байт",
+            workplace_id, report.period, len(content)
+        )
+
+        return ExcelFile(
+            filename=f"report_{workplace_id}_{report.period}.xlsx",
+            content=content,
+        )

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from fastapi.responses import Response
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,7 @@ from app.users.model import User as UserModel
 
 from app.core.database import get_db
 from app.core.security import get_owner_or_admin, get_owner_or_employees
+from app.core.excel_report import XLSX_MEDIA_TYPE
 
 from app.exceptions import (
     EmployeeNotFoundException,
@@ -389,3 +391,74 @@ async def get_calendar_report(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg
         )
+
+
+@router.get(
+    "/reports/calendar/excel",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {XLSX_MEDIA_TYPE: {}},
+            "description": "Excel-файл (.xlsx) с отчётом за месяц",
+        },
+        400: {"description": "Некорректный месяц или год"},
+        404: {"description": "Рабочая точка не найдена"},
+    },
+)
+async def get_calendar_report_excel(
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    month: Annotated[
+        int, 
+        Query(
+            description="Месяц отчёта (1–12)"
+        )
+    ],
+    year: Annotated[
+        int, 
+        Query(
+            description="Год отчёта (например, 2026)"
+        )
+    ],
+    db: Annotated[
+        AsyncSession, 
+        Depends(get_db)
+    ],
+    _: Annotated[
+        UserModel, 
+        Depends(get_owner_or_admin)
+    ]
+) -> Response:
+    """
+    Скачивание отчёта по рабочей точке за месяц в формате Excel (.xlsx).
+    Содержимое совпадает с GET /shifts/reports/calendar.
+    Доступно только администратору и владельцу.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        report_file = await shift_service.get_calendar_report_excel(
+            workplace_id, month, year
+        )
+    except InvalidReportPeriodException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.msg
+        )
+    except WorkplaceNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
+
+    return Response(
+        content=report_file.content,
+        media_type=report_file.media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{report_file.filename}"',
+        },
+    )
