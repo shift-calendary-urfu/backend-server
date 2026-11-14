@@ -185,3 +185,82 @@ class ShiftsDuplicateResponse(BaseModel):
     message: Annotated[str, Field(
         description="Сообщения о процессе создания дубликатов смен"
     )]
+
+
+class EmployeeReportItem(BaseModel):
+    """
+    Строка отчёта по одному сотруднику за месяц.
+    """
+    employee_id: Annotated[int, Field(
+        ge=1,
+        description="ID работника"
+    )]
+    full_name: Annotated[str, Field(
+        description="ФИО работника"
+    )]
+    hours_worked: Annotated[float, Field(
+        ge=0,
+        description="Количество отработанных часов за месяц (все смены)"
+    )]
+    full_shifts_count: Annotated[int, Field(
+        ge=0,
+        description="Количество полных смен (от открытия до закрытия рабочей точки)"
+    )]
+    full_shifts_hours: Annotated[float, Field(
+        ge=0,
+        description="Количество часов, отработанных в полных сменах"
+    )]
+
+
+class CalendarReportResponse(BaseModel):
+    """
+    Отчёт по рабочей точке за месяц.
+    """
+    workplace_id: Annotated[int, Field(
+        ge=1,
+        description="ID рабочего пространства"
+    )]
+    period: Annotated[str, Field(
+        pattern=r"^\d{4}-\d{2}$",
+        description="Период отчёта в формате YYYY-MM"
+    )]
+    total_hours: Annotated[float, Field(
+        ge=0,
+        description="Общее количество отработанных часов на точке за месяц"
+    )]
+    total_shifts: Annotated[int, Field(
+        ge=0,
+        description="Общее количество смен на точке за месяц"
+    )]
+    employees: Annotated[list[EmployeeReportItem], Field(
+        description="Отчёт по каждому работнику"
+    )]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "workplace_id": 1,
+                    "period": "2026-10",
+                    "total_hours": 58.0,
+                    "total_shifts": 5,
+                    "employees": [
+                        {
+                            "employee_id": 1,
+                            "full_name": "Иванов Иван Иванович",
+                            "hours_worked": 34.0,
+                            "full_shifts_count": 2,
+                            "full_shifts_hours": 26.0
+                        },
+                        {
+                            "employee_id": 2,
+                            "full_name": "Смирнова Анна",
+                            "hours_worked": 24.0,
+                            "full_shifts_count": 2,
+                            "full_shifts_hours": 24.0
+                        }
+                    ]
+                }
+            ]
+        }
+    )

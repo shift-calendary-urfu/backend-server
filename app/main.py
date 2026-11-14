@@ -37,6 +37,8 @@ app.add_middleware(
         "Accept",
         "X-Requested-With",
     ],
+    # Чтобы фронтенд мог прочитать имя скачиваемого файла (отчёт по сменам)
+    expose_headers=["Content-Disposition"],
 )
 # --------------------------
 
