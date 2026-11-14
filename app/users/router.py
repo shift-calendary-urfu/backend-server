@@ -11,6 +11,9 @@ from app.users.services import UserServices
 
 from app.exceptions import InvalidPasswordException
 
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(
     tags=["Users"],
@@ -28,6 +31,7 @@ async def get_info_user(
     """
     Возвращает информацию о текущем пользователе.
     """
+    logger.info("Получение информации о юзера: user_id=%s", current_user.id)
     return current_user
 
 
