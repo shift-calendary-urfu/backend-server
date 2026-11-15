@@ -32,3 +32,4 @@ import app.employees.model
 import app.workplaces.model
 import app.shifts.model
 import app.shift_templates.models
+import app.chats.models
