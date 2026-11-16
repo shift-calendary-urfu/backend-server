@@ -62,3 +62,16 @@ class InvalidReportPeriodException(Exception):
     def __init__(self, msg: str):
         self.msg = msg
         super().__init__(self.msg)
+
+
+
+class WorkplaceChatNotFoundException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class WorkplaceChatCreationException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
