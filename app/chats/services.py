@@ -18,6 +18,7 @@ async def ensure_workplace_chat(
     db: AsyncSession,
     workplace_id: int,
     owner_id: int,
+    title: str,
 ) -> int:
     """Создаёт общий чат торговой точки и добавляет владельца."""
 
@@ -26,6 +27,7 @@ async def ensure_workplace_chat(
         .values(
             type=ChatType.WORKPLACE,
             workplace_id=workplace_id,
+            title=title,
         )
         .on_conflict_do_nothing(
             index_elements=[Chat.workplace_id],

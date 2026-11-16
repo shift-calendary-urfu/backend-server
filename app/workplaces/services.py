@@ -73,6 +73,7 @@ class WorkplaceServices:
             db=self.db,
             workplace_id=new_workplace.id,
             owner_id=owner.id,
+            title=new_workplace.name,
         )
 
         await self.db.commit()
