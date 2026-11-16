@@ -13,6 +13,8 @@ from app.shifts.model import Shift as ShiftModel
 
 from app.shift_templates.models import ShiftTemplate as ShiftTemplateModel
 
+from app.chats.services import ensure_workplace_chat
+
 from app.core.logger import get_logger
 
 from app.exceptions import WorkplaceExistsException, WorkplaceNotFoundException
@@ -65,6 +67,14 @@ class WorkplaceServices:
         )
 
         self.db.add(new_workplace)
+        await self.db.flush()
+
+        await ensure_workplace_chat(
+            db=self.db,
+            workplace_id=new_workplace.id,
+            owner_id=owner.id,
+        )
+
         await self.db.commit()
 
         logger.info("Точка создана: id=%s, name=%s", new_workplace.id, new_workplace.name)
