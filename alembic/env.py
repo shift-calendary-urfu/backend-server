@@ -13,6 +13,7 @@ from app.shift_templates.models import ShiftTemplate
 from app.shifts.model import Shift
 from app.users.model import User
 from app.workplaces.model import Workplace
+from app.chats.models import Chat, Message, ChatMember
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
