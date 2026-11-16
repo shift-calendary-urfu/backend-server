@@ -11,6 +11,8 @@ from app.users.model import User as UserModel
 
 from app.workplaces.model import Workplace as WorkplaceModel
 
+from app.chats.services import add_member_to_workplace_chat
+
 from app.core.logger import get_logger
 
 from app.exceptions import (
@@ -101,6 +103,11 @@ class EmployeeServices:
                 )
             )
 
+            await add_member_to_workplace_chat(
+                db=self.db,
+                workplace_id=workplace_id,
+                user_id=user.id,
+            )
 
             await self.db.commit()
             await self.db.refresh(existing_employee, attribute_names=["user"])
@@ -117,6 +124,14 @@ class EmployeeServices:
         )
 
         self.db.add(new_employee)
+        await self.db.flush()
+
+        await add_member_to_workplace_chat(
+            db=self.db,
+            workplace_id=workplace_id,
+            user_id=user.id,
+        )
+
         await self.db.commit()
 
         await self.db.refresh(new_employee, attribute_names=["user"])
