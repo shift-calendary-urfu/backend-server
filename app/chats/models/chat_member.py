@@ -54,6 +54,7 @@ class ChatMember(Base):
         nullable=False,
     )
 
+    # если будет ошибка в модели , она здесь в строке server_default=false()
     is_active_at_closure: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
