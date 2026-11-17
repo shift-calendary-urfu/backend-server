@@ -13,6 +13,8 @@ from app.shifts.model import Shift as ShiftModel
 
 from app.shift_templates.models import ShiftTemplate as ShiftTemplateModel
 
+from app.chats.models import Chat, ChatMember
+
 from app.chats.services import ensure_workplace_chat
 
 from app.core.logger import get_logger
@@ -203,6 +205,27 @@ class WorkplaceServices:
             raise WorkplaceNotFoundException(
                 "Workplace not found"
             )
+
+        chat_id = select(Chat.id).where(
+            Chat.workplace_id == workplace_id
+        ).scalar_subquery()
+
+        await self.db.execute(
+            update(ChatMember)
+            .where(
+                ChatMember.chat_id == chat_id,
+                or_(
+                    ChatMember.user_id == result.owner_id,
+                    ChatMember.user_id.in_(
+                        select(EmployeeModel.user_id).where(
+                            EmployeeModel.workplace_id == workplace_id,
+                            EmployeeModel.is_active
+                        )
+                    )
+                )
+            )
+            .values(is_active_at_closure=True)
+        )
 
         await self.db.execute(
             update(EmployeeModel)
