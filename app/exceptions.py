@@ -75,3 +75,15 @@ class WorkplaceChatCreationException(Exception):
     def __init__(self, msg: str):
         self.msg = msg
         super().__init__(self.msg)
+
+
+class ChatWithSelfException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class CommonWorkplaceNotFoundException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
