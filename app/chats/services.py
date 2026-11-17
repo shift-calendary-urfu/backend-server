@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chats.models import Chat, ChatMember, Message
 from app.chats.models.chat import ChatType
-from app.chats.schemas import ChatListItem
+from app.chats.schemas import ChatListItem, DirectChatResponse
 
 from app.employees.model import Employee
 
@@ -18,6 +18,9 @@ from app.core.logger import get_logger
 from app.exceptions import (
     WorkplaceChatCreationException,
     WorkplaceChatNotFoundException,
+    ChatWithSelfException,
+    CommonWorkplaceNotFoundException,
+    UserNotFoundException,
 )
 
 
@@ -258,7 +261,127 @@ class ChatServices:
 
         result = await self.db.execute(stmt)
 
-        return [
+        result_list = [
             ChatListItem.model_validate(dict(row))
             for row in result.mappings().all()
         ]
+
+        logger.info("Чаты получены для user_id=%d", user_id)
+
+        return result_list
+
+
+    async def get_or_create_direct_chat(
+        self,
+        user_id: int,
+        target_user_id: int,
+    ) -> DirectChatResponse:
+        """Возвращает существующий или создаёт новый личный чат."""
+
+        if user_id == target_user_id:
+            logger.error('Попытка создать чат с самим собой, user_id=%d', user_id)
+            raise ChatWithSelfException("Попытка создать чат с самим собой")
+
+        # Блокируем одновременное создание чата одной пары пользователей
+        first_id, second_id = sorted((user_id, target_user_id))
+
+        await self.db.execute(
+            select(
+                func.pg_advisory_xact_lock(first_id, second_id)
+            )
+        )
+
+        # Проверяем целевого пользователя
+        target_user = await self.db.scalar(
+            select(User)
+            .where(
+                User.id == target_user_id,
+                User.is_active.is_(True),
+            )
+            .with_for_update()
+        )
+
+        if target_user is None:
+            logger.warning("Второй пользователь не найден, user_id=%s", target_user_id)
+            raise UserNotFoundException(f"Второй пользователь не найден, user_id={target_user_id}")
+
+        # Проверяем существующий личный чат
+        first_member = aliased(ChatMember)
+        second_member = aliased(ChatMember)
+
+        existing_chat_id = await self.db.scalar(
+            select(Chat.id)
+            .join(
+                first_member,
+                first_member.chat_id == Chat.id,
+            )
+            .join(
+                second_member,
+                second_member.chat_id == Chat.id,
+            )
+            .where(
+                Chat.type == ChatType.DIRECT,
+                first_member.user_id == user_id,
+                second_member.user_id == target_user_id,
+            )
+        )
+
+        if existing_chat_id is not None:
+            await self.db.commit()
+            logger.info("Чат найден, user_id=%d, target_user_id=%d", user_id, target_user_id)
+            return DirectChatResponse(chat_id=existing_chat_id)
+
+        # Проверяем наличие общей активной рабочей точки
+        user_is_member = or_(
+            Workplace.owner_id == user_id,
+            exists(
+                select(1).where(
+                    Employee.workplace_id == Workplace.id,
+                    Employee.user_id == user_id,
+                    Employee.is_active.is_(True),
+                )
+            ),
+        )
+
+        target_is_member = or_(
+            Workplace.owner_id == target_user_id,
+            exists(
+                select(1).where(
+                    Employee.workplace_id == Workplace.id,
+                    Employee.user_id == target_user_id,
+                    Employee.is_active.is_(True),
+                )
+            ),
+        )
+
+        common_workplace_id = await self.db.scalar(
+            select(Workplace.id)
+            .where(
+                Workplace.is_active.is_(True),
+                user_is_member,
+                target_is_member,
+            )
+            .limit(1)
+        )
+
+        if common_workplace_id is None:
+            logger.error("Пользователи не имеют общей рабочей точки для создания чата, user_id=%d, target_user_id=%d", user_id, target_user_id)
+            raise CommonWorkplaceNotFoundException(
+                f"Пользователи не имеют общей рабочей точки для создания чата, user_id={user_id}, target_user_id={target_user_id}"
+            )
+
+        # Создаём личный чат
+        chat = Chat(type=ChatType.DIRECT)
+
+        self.db.add(chat)
+        await self.db.flush()
+
+        self.db.add_all([
+            ChatMember(chat_id=chat.id, user_id=user_id),
+            ChatMember(chat_id=chat.id, user_id=target_user_id),
+        ])
+
+        await self.db.commit()
+        logger.info("Чат создан, user_id=%d, target_user_id=%d", user_id, target_user_id)
+
+        return DirectChatResponse(chat_id=chat.id)
