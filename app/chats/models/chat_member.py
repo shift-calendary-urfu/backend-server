@@ -1,13 +1,14 @@
 
 from datetime import datetime
-from enum import Enum
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
     UniqueConstraint,
     func,
+    false
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,6 +51,13 @@ class ChatMember(Base):
         Integer,
         default=0,
         server_default="0",
+        nullable=False,
+    )
+
+    is_active_at_closure: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=false(),
         nullable=False,
     )
 
