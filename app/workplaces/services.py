@@ -15,7 +15,7 @@ from app.shift_templates.models import ShiftTemplate as ShiftTemplateModel
 
 from app.chats.models import Chat, ChatMember
 
-from app.chats.services import ensure_workplace_chat
+from app.chats.services import ChatServices
 
 from app.core.logger import get_logger
 
@@ -71,8 +71,7 @@ class WorkplaceServices:
         self.db.add(new_workplace)
         await self.db.flush()
 
-        await ensure_workplace_chat(
-            db=self.db,
+        await ChatServices(db=self.db,).ensure_workplace_chat(
             workplace_id=new_workplace.id,
             owner_id=owner.id,
             title=new_workplace.name,

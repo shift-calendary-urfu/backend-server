@@ -11,7 +11,7 @@ from app.users.model import User as UserModel
 
 from app.workplaces.model import Workplace as WorkplaceModel
 
-from app.chats.services import add_member_to_workplace_chat
+from app.chats.services import ChatServices
 
 from app.core.logger import get_logger
 
@@ -103,8 +103,7 @@ class EmployeeServices:
                 )
             )
 
-            await add_member_to_workplace_chat(
-                db=self.db,
+            await ChatServices(db=self.db,).add_member_to_workplace_chat(
                 workplace_id=workplace_id,
                 user_id=user.id,
             )
@@ -126,8 +125,7 @@ class EmployeeServices:
         self.db.add(new_employee)
         await self.db.flush()
 
-        await add_member_to_workplace_chat(
-            db=self.db,
+        await ChatServices(db=self.db,).add_member_to_workplace_chat(
             workplace_id=workplace_id,
             user_id=user.id,
         )
