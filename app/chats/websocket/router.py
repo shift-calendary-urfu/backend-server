@@ -197,23 +197,23 @@ async def chat_websocket(
                         },
                     )
 
-                except ChatNotFoundException as e:
+                except (ChatNotFoundException, ChatReadOnlyException, InvalidMessageTextException) as e:
                     await websocket.send_json({
                         "type": "error",
                         "detail": e.msg,
                     })
 
-                except ChatReadOnlyException as e:
+                except Exception:
+                    logger.exception(
+                        "Ошибка при обработке сообщения, user_id=%d, chat_id=%d",
+                        user.id,
+                        chat_id,
+                    )
                     await websocket.send_json({
                         "type": "error",
-                        "detail": e.msg,
+                        "detail": "Внутренняя ошибка сервера",
                     })
-
-                except InvalidMessageTextException as e:
-                    await websocket.send_json({
-                        "type": "error",
-                        "detail": e.msg,
-                    })
+                    continue
 
             else:
                 await websocket.send_json({
@@ -226,3 +226,6 @@ async def chat_websocket(
 
     finally:
         manager.disconnect(user.id, websocket)
+        
+        if not manager.is_connected(user.id):
+            last_message_at.pop(user.id, None)
