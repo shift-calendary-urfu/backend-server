@@ -1,4 +1,4 @@
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 
 from app.core.logger import get_logger
 
@@ -32,6 +32,28 @@ class ConnectionManager:
 
     def is_connected(self, user_id: int) -> bool:
         return bool(self.active_connections.get(user_id))
+
+    async def send_personal_message(
+        self,
+        user_id: int,
+        message: dict,
+    ) -> None:
+        connections = self.active_connections.get(user_id, []).copy()
+
+        for websocket in connections:
+            try:
+                await websocket.send_json(message)
+            except (WebSocketDisconnect, RuntimeError, OSError):
+                self.disconnect(user_id, websocket)
+
+    async def broadcast_to_users(
+        self,
+        user_ids: list[int],
+        message: dict,
+    ) -> None:
+        for user_id in set(user_ids):
+            await self.send_personal_message(user_id, message)
+
 
 
 manager = ConnectionManager()
