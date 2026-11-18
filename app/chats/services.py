@@ -23,6 +23,8 @@ from app.core.logger import get_logger
 
 from app.exceptions import (
     ChatNotFoundException,
+    ChatReadOnlyException,
+    InvalidMessageTextException,
     WorkplaceChatCreationException,
     WorkplaceChatNotFoundException,
     ChatWithSelfException,
@@ -618,4 +620,97 @@ class ChatServices:
 
         return ChatReadResponse(
             last_read_message_id=last_read_message_id,
+        )
+
+
+    async def create_message(
+        self,
+        chat_id: int,
+        user_id: int,
+        text: str,
+    ) -> MessageResponse:
+        text = text.strip()
+
+        if not text or len(text) > 4000:
+            raise InvalidMessageTextException(f"Текст недопустимного размера, длина: {len(text)}")
+
+        user = await self.db.scalar(
+            select(User).where(
+                User.id == user_id,
+                User.is_active.is_(True),
+            )
+        )
+
+        if user is None:
+            logger.warning("Пользователь не найден, user_id=%d", user_id)
+            raise ChatNotFoundException("Пользователь не найден")
+
+        chat = await self.db.scalar(
+            select(Chat)
+            .join(ChatMember, ChatMember.chat_id == Chat.id)
+            .where(
+                Chat.id == chat_id,
+                ChatMember.user_id == user_id,
+            )
+        )
+
+        if chat is None:
+            logger.warning("Чат не найден, user_id=%d", user_id)
+            raise ChatNotFoundException(f"Чат не найден")
+
+        if chat.type == ChatType.WORKPLACE:
+            workplace = await self.db.scalar(
+                select(Workplace).where(
+                    Workplace.id == chat.workplace_id,
+                    Workplace.is_active.is_(True),
+                )
+            )
+
+            if workplace is None:
+                logger.warning("Не удалось найти рабочую точку для user_id=%d", user_id)
+                raise ChatReadOnlyException("Рабочая точка не найдена")
+
+            if workplace.owner_id != user_id:
+                employee = await self.db.scalar(
+                    select(Employee).where(
+                        Employee.workplace_id == workplace.id,
+                        Employee.user_id == user_id,
+                        Employee.is_active.is_(True),
+                    )
+                )
+
+                if employee is None:
+                    raise ChatReadOnlyException("Работник не найден")
+
+        message = Message(
+            chat_id=chat_id,
+            sender_id=user_id,
+            text=text,
+        )
+
+        self.db.add(message)
+        await self.db.flush()
+        await self.db.refresh(message)
+
+        await self.db.commit()
+
+        sender_name = " ".join(
+            name
+            for name in (
+                user.first_name,
+                user.second_name,
+                user.third_name,
+            )
+            if name
+        )
+
+        logger.info("Сообщение создано успешно, user_id=%d, chat_id=%d", user_id, chat_id)
+
+        return MessageResponse(
+            id=message.id,
+            chat_id=message.chat_id,
+            sender_id=message.sender_id,
+            sender_name=sender_name,
+            text=message.text,
+            created_at=message.created_at,
         )
