@@ -656,7 +656,7 @@ class ChatServices:
 
         if chat is None:
             logger.warning("Чат не найден, user_id=%d", user_id)
-            raise ChatNotFoundException(f"Чат не найден")
+            raise ChatNotFoundException("Чат не найден")
 
         if chat.type == ChatType.WORKPLACE:
             workplace = await self.db.scalar(
@@ -714,3 +714,46 @@ class ChatServices:
             text=message.text,
             created_at=message.created_at,
         )
+
+
+    async def get_chat_member_ids(self, chat_id: int) -> list[int]:
+        chat = await self.db.scalar(
+            select(Chat).where(Chat.id == chat_id)
+        )
+
+        if chat is None:
+            raise ChatNotFoundException("Чат не найден")
+
+        query = (
+            select(ChatMember.user_id)
+            .join(User, User.id == ChatMember.user_id)
+            .where(
+                ChatMember.chat_id == chat_id,
+                User.is_active.is_(True),
+            )
+        )
+
+        if chat.type == ChatType.WORKPLACE:
+            workplace = await self.db.scalar(
+                select(Workplace).where(Workplace.id == chat.workplace_id)
+            )
+
+            if workplace is None:
+                raise ChatNotFoundException("Рабочая точка не найдена")
+
+            is_active_employee = exists(
+                select(Employee.id).where(
+                    Employee.workplace_id == workplace.id,
+                    Employee.user_id == User.id,
+                    Employee.is_active.is_(True),
+                )
+            )
+
+            query = query.where(
+                or_(
+                    User.id == workplace.owner_id,
+                    is_active_employee,
+                )
+            )
+
+        return list(await self.db.scalars(query))
