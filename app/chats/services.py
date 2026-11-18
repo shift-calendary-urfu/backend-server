@@ -743,6 +743,10 @@ class ChatServices:
                 logger.warning("Для рабочей точки не найден чат, chat_id=%d", chat_id)
                 raise ChatNotFoundException("Рабочая точка не найдена")
 
+            if not workplace.is_active:
+                logger.info("Рабочая точка закрыта, получатели отсутствуют, chat_id=%d", chat_id)
+                return []
+
             is_active_employee = exists(
                 select(Employee.id).where(
                     Employee.workplace_id == workplace.id,
