@@ -8,6 +8,7 @@ from app.users.model import User
 from app.chats.services import ChatServices
 from app.chats.schemas import ChatListItem, DirectChatCreate, DirectChatResponse
 from app.exceptions import (
+    ChatNotFoundException,
     ChatWithSelfException,
     CommonWorkplaceNotFoundException,
     UserNotFoundException,
@@ -68,6 +69,29 @@ async def create_direct_chat(
         )
 
     except UserNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg,
+        )
+
+
+@router.get(
+    "/{chat_id}",
+    response_model=ChatListItem,
+)
+async def get_chat(
+    chat_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ChatListItem:
+    """Получение конкретного чата."""
+    try:
+        services = ChatServices(db)
+        return await services.get_chat(
+            chat_id=chat_id,
+            user_id=current_user.id,
+        )
+    except ChatNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.msg,
