@@ -157,4 +157,10 @@ class MessageHistoryResponse(BaseModel):
 class ChatReadResponse(BaseModel):
     """Результат отметки сообщений прочитанными."""
 
-    last_read_message_id: MessageId
+    last_read_message_id: Annotated[
+        int,
+        Field(
+            ge=0,
+            description="ID последнего прочитанного сообщения",
+        ),
+    ]
