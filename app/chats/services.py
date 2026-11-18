@@ -1,4 +1,4 @@
-from sqlalchemy import and_, case, exists, func, or_, select
+from sqlalchemy import and_, case, exists, func, or_, select, update
 from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.chats.models import Chat, ChatMember, Message
 from app.chats.models.chat import ChatType
 from app.chats.schemas import (
-    ChatListItem, 
+    ChatListItem,
+    ChatReadResponse, 
     DirectChatResponse,
     MessageHistoryResponse, 
     MessageResponse,
@@ -574,4 +575,47 @@ class ChatServices:
                 MessageResponse.model_validate(dict(message))
                 for message in reversed(messages)
             ]
+        )
+
+    async def mark_as_read(
+        self,
+        chat_id: int,
+        user_id: int,
+    ) -> ChatReadResponse:
+        await self.get_chat(chat_id=chat_id, user_id=user_id)
+
+        last_message_id = (
+            select(func.coalesce(func.max(Message.id), 0))
+            .where(Message.chat_id == chat_id)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            update(ChatMember)
+            .where(
+                ChatMember.chat_id == chat_id,
+                ChatMember.user_id == user_id,
+            )
+            .values(
+                last_read_message_id=func.greatest(
+                    ChatMember.last_read_message_id,
+                    last_message_id,
+                )
+            )
+            .returning(ChatMember.last_read_message_id)
+        )
+
+        result = await self.db.execute(stmt)
+        last_read_message_id = result.scalar_one_or_none()
+
+        if last_read_message_id is None:
+            logger.error("Чат для пользователя user_id=%d не существует", str(user_id))
+            raise ChatNotFoundException("Чат не найден")
+
+        await self.db.commit()
+
+        logger.info("Получего последнее сообщение, user_id=%d", user_id)
+
+        return ChatReadResponse(
+            last_read_message_id=last_read_message_id,
         )
