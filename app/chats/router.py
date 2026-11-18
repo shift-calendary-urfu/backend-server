@@ -9,6 +9,7 @@ from app.users.model import User
 
 from app.chats.services import ChatServices
 from app.chats.schemas import (
+    ChatReadResponse,
     ChatListItem, 
     DirectChatCreate, 
     DirectChatResponse,
@@ -54,7 +55,7 @@ async def get_chats(
 @router.post(
     "/direct",
     response_model=DirectChatResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_201_CREATED,
 )
 async def create_direct_chat(
     chat_data: DirectChatCreate,
@@ -167,6 +168,41 @@ async def get_messages(
             user_id=current_user.id,
             limit=limit,
             before_id=before_id,
+        )
+    except ChatNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg,
+        )
+
+
+@router.post(
+    "/{chat_id}/mark",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ChatReadResponse,
+)
+async def mark_chat_as_read(
+    chat_id: Annotated[
+        int, 
+        Path(
+            gt=1,
+            description='Идентификатор чата'
+    )],
+    db: Annotated[
+        AsyncSession, 
+        Depends(get_db)
+    ],
+    current_user: Annotated[
+        User, 
+        Depends(get_current_user)
+    ],
+) -> ChatReadResponse:
+    """Отметка сообщений чата как прочитанных."""
+    try:
+        services = ChatServices(db)
+        return await services.mark_as_read(
+            chat_id=chat_id,
+            user_id=current_user.id,
         )
     except ChatNotFoundException as e:
         raise HTTPException(
