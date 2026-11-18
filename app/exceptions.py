@@ -62,3 +62,45 @@ class InvalidReportPeriodException(Exception):
     def __init__(self, msg: str):
         self.msg = msg
         super().__init__(self.msg)
+
+
+
+class WorkplaceChatNotFoundException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class WorkplaceChatCreationException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class ChatWithSelfException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class CommonWorkplaceNotFoundException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class ChatNotFoundException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+
+class ChatReadOnlyException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+class InvalidMessageTextException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)

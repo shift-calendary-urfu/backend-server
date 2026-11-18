@@ -162,11 +162,9 @@ class AuthTokensManager:
         }
 
 
-# -------------------------------------------------------------
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db), 
+async def authenticate_user(
+    token: str,
+    db: AsyncSession,
 ) -> UserModel:
     """
     Проверяет JWT и возвращает текущего пользователя из базы данных.
@@ -209,9 +207,23 @@ async def get_current_user(
         )
     )
     if user is None:
+        logger.warning("Пользователя не существует")
         raise credentials_exceptions
 
     return user
+
+
+# -------------------------------------------------------------
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db), 
+) -> UserModel:
+    """
+    Проверяет JWT и возвращает текущего пользователя из базы данных.
+    """
+    return await authenticate_user(token=token ,db=db)
+
 
 
 async def get_owner_or_admin(
