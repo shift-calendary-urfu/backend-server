@@ -10,8 +10,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: dict[int, list[WebSocket]] = {}
 
-    async def connect(self, user_id: int, websocket: WebSocket) -> None:
-        await websocket.accept()
+    def connect(self, user_id: int, websocket: WebSocket) -> None:
         logger.info("Подключение к WS user_id=%d", user_id)
         self.active_connections.setdefault(user_id, []).append(websocket)
 
