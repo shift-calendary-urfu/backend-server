@@ -18,16 +18,15 @@ class ConnectionManager:
         connections = self.active_connections.get(user_id)
 
         if connections is None:
-            logger.warning("Попытка отключиться от несуществующего соединения, user_id=%d", user_id)
             return
 
         if websocket in connections:
-            logger.info("Отключение соединения, user_id=%d", user_id)
             connections.remove(websocket)
+            logger.info("Отключение соединения, user_id=%d", user_id)
 
         if not connections:
-            logger.info("Отключение всех соединений, user_id=%d", user_id)
             del self.active_connections[user_id]
+            logger.info("Отключение всех соединений, user_id=%d", user_id)
 
     def is_connected(self, user_id: int) -> bool:
         return bool(self.active_connections.get(user_id))
@@ -35,24 +34,28 @@ class ConnectionManager:
     async def send_personal_message(
         self,
         user_id: int,
-        message: dict,
+        message: dict[str, object],
     ) -> None:
         connections = self.active_connections.get(user_id, []).copy()
 
         for websocket in connections:
             try:
                 await websocket.send_json(message)
+
             except (WebSocketDisconnect, RuntimeError, OSError):
+                logger.warning(
+                    "Ошибка отправки WS, удаляем соединение, user_id=%d",
+                    user_id,
+                )
                 self.disconnect(user_id, websocket)
 
     async def broadcast_to_users(
         self,
         user_ids: list[int],
-        message: dict,
+        message: dict[str, object],
     ) -> None:
         for user_id in set(user_ids):
             await self.send_personal_message(user_id, message)
-
 
 
 manager = ConnectionManager()

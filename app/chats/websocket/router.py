@@ -1,17 +1,17 @@
+
 import asyncio
 import time
 
 import jwt
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chats.websocket.manager import manager
 from app.chats.services import ChatServices
 
 from app.config import settings
 
-from app.core.database import get_db
+from app.core.database import AsyncSessionLocal
 from app.core.security import authenticate_user
 
 from app.exceptions import (
@@ -27,21 +27,25 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/chats", tags=["Chats WebSocket"])
 
+AUTH_TIMEOUT = 5
 PING_INTERVAL = 30
 PONG_TIMEOUT = 60
+
+MESSAGE_RATE_LIMIT = 1.0
+
+last_message_at: dict[int, float] = {}
 
 
 @router.websocket("/ws")
 async def chat_websocket(
     websocket: WebSocket,
-    db: AsyncSession = Depends(get_db),
 ) -> None:
     await websocket.accept()
 
     try:
         data = await asyncio.wait_for(
             websocket.receive_json(),
-            timeout=5,
+            timeout=AUTH_TIMEOUT,
         )
 
         if (
@@ -53,7 +57,8 @@ async def chat_websocket(
             return
 
         token = data["token"]
-        user = await authenticate_user(token, db)
+        async with AsyncSessionLocal() as db:
+            user = await authenticate_user(token, db)
 
         payload = jwt.decode(
             token,
@@ -62,33 +67,74 @@ async def chat_websocket(
         )
         token_exp = payload["exp"]
 
-    except (asyncio.TimeoutError, HTTPException, jwt.PyJWTError, ValueError, KeyError):
+    except (
+        asyncio.TimeoutError,
+        HTTPException,
+        jwt.PyJWTError,
+        ValueError,
+        KeyError,
+        TypeError,
+    ):
         await websocket.close(code=4003)
         return
+
     except WebSocketDisconnect:
         return
 
     manager.connect(user.id, websocket)
 
-    last_pong = time.monotonic()
+    next_ping_at = time.monotonic() + PING_INTERVAL
+    pending_ping_at: float | None = None
 
     try:
         while True:
+            now = time.monotonic()
+
             if time.time() >= token_exp:
                 await websocket.close(code=4003)
                 break
 
-            if time.monotonic() - last_pong >= PONG_TIMEOUT:
+            if (
+                pending_ping_at is not None
+                and now - pending_ping_at >= PONG_TIMEOUT
+            ):
                 await websocket.close(code=4000)
                 break
+
+            if (
+                pending_ping_at is None
+                and now >= next_ping_at
+            ):
+                await websocket.send_json({"type": "ping"})
+
+                pending_ping_at = now
+                continue
+
+            if pending_ping_at is not None:
+                timeout = min(
+                    PONG_TIMEOUT - (now - pending_ping_at),
+                    token_exp - time.time(),
+                )
+            else:
+                timeout = min(
+                    next_ping_at - now,
+                    token_exp - time.time(),
+                )
 
             try:
                 message = await asyncio.wait_for(
                     websocket.receive_json(),
-                    timeout=PING_INTERVAL,
+                    timeout=max(timeout, 0.001),
                 )
+
             except asyncio.TimeoutError:
-                await websocket.send_json({"type": "ping"})
+                continue
+
+            except ValueError:
+                await websocket.send_json({
+                    "type": "error",
+                    "detail": "Invalid JSON",
+                })
                 continue
 
             if not isinstance(message, dict):
@@ -99,7 +145,9 @@ async def chat_websocket(
                 continue
 
             if message.get("type") == "pong":
-                last_pong = time.monotonic()
+                if pending_ping_at is not None:
+                    pending_ping_at = None
+                    next_ping_at = time.monotonic() + PING_INTERVAL
 
             elif message.get("type") == "message":
                 chat_id = message.get("chat_id")
@@ -108,6 +156,7 @@ async def chat_websocket(
                 if (
                     not isinstance(chat_id, int)
                     or isinstance(chat_id, bool)
+                    or chat_id <= 0
                     or not isinstance(text, str)
                 ):
                     await websocket.send_json({
@@ -116,22 +165,35 @@ async def chat_websocket(
                     })
                     continue
 
-                chat_services = ChatServices(db)
+                now = time.monotonic()
+                last_sent = last_message_at.get(user.id, 0.0)
+
+                if now - last_sent < MESSAGE_RATE_LIMIT:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": "rate_limit",
+                    })
+                    continue
+
+                last_message_at[user.id] = now
 
                 try:
-                    saved_message = await chat_services.create_message(
-                        chat_id=chat_id,
-                        user_id=user.id,
-                        text=text,
-                    )
+                    async with AsyncSessionLocal() as db:
+                        chat_services = ChatServices(db)
 
-                    user_ids = await chat_services.get_chat_member_ids(chat_id)
+                        saved_message = await chat_services.create_message(
+                            chat_id=chat_id,
+                            user_id=user.id,
+                            text=text,
+                        )
+
+                        user_ids = await chat_services.get_chat_member_ids(chat_id)
 
                     await manager.broadcast_to_users(
-                        user_ids=user_ids,
-                        message={
+                        user_ids,
+                        {
                             "type": "new_message",
-                            "message": saved_message.model_dump(mode="json"),
+                            "data": saved_message.model_dump(mode="json"),
                         },
                     )
 
@@ -161,5 +223,6 @@ async def chat_websocket(
 
     except WebSocketDisconnect:
         pass
+
     finally:
         manager.disconnect(user.id, websocket)
