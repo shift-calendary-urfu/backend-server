@@ -93,3 +93,14 @@ class ChatNotFoundException(Exception):
     def __init__(self, msg: str):
         self.msg = msg
         super().__init__(self.msg)
+
+
+class ChatReadOnlyException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
+
+class InvalidMessageTextException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+        super().__init__(self.msg)
