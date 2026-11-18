@@ -303,7 +303,7 @@ class ChatServices:
 
         if target_user is None:
             logger.warning("Второй пользователь не найден, user_id=%s", target_user_id)
-            raise UserNotFoundException(f"Второй пользователь не найден, user_id={target_user_id}")
+            raise UserNotFoundException(f"Второй пользователь не найден")
 
         # Проверяем существующий личный чат
         first_member = aliased(ChatMember)
@@ -367,7 +367,7 @@ class ChatServices:
         if common_workplace_id is None:
             logger.error("Пользователи не имеют общей рабочей точки для создания чата, user_id=%d, target_user_id=%d", user_id, target_user_id)
             raise CommonWorkplaceNotFoundException(
-                f"Пользователи не имеют общей рабочей точки для создания чата, user_id={user_id}, target_user_id={target_user_id}"
+                f"Пользователи не имеют общей рабочей точки для создания чата"
             )
 
         # Создаём личный чат
