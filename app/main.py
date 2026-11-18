@@ -7,6 +7,7 @@ from app.workplaces.router import router as workplaces_router
 from app.employees.router import router as employees_router
 from app.shifts.router import router as shifts_router
 from app.chats.router import router as chats_router
+from app.chats.websocket.router import router as chat_websocket_router
 
 from app.config import settings
 from app.core.logger import get_logger
@@ -51,6 +52,7 @@ app.include_router(workplaces_router)
 app.include_router(employees_router)
 app.include_router(shifts_router)
 app.include_router(chats_router)
+app.include_router(chat_websocket_router)
 
 # ------------------
 
