@@ -7,9 +7,18 @@ from fastapi.exceptions import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chats.websocket.manager import manager
+from app.chats.services import ChatServices
+
 from app.config import settings
+
 from app.core.database import get_db
 from app.core.security import authenticate_user
+
+from app.exceptions import (
+    ChatNotFoundException,
+    ChatReadOnlyException,
+    InvalidMessageTextException,
+)
 
 from app.core.logger import get_logger
 
@@ -92,10 +101,62 @@ async def chat_websocket(
             if message.get("type") == "pong":
                 last_pong = time.monotonic()
 
+            elif message.get("type") == "message":
+                chat_id = message.get("chat_id")
+                text = message.get("text")
+
+                if (
+                    not isinstance(chat_id, int)
+                    or isinstance(chat_id, bool)
+                    or not isinstance(text, str)
+                ):
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": "Invalid message format",
+                    })
+                    continue
+
+                chat_services = ChatServices(db)
+
+                try:
+                    saved_message = await chat_services.create_message(
+                        chat_id=chat_id,
+                        user_id=user.id,
+                        text=text,
+                    )
+
+                    user_ids = await chat_services.get_chat_member_ids(chat_id)
+
+                    await manager.broadcast_to_users(
+                        user_ids=user_ids,
+                        message={
+                            "type": "new_message",
+                            "message": saved_message.model_dump(mode="json"),
+                        },
+                    )
+
+                except ChatNotFoundException as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": e.msg,
+                    })
+
+                except ChatReadOnlyException as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": e.msg,
+                    })
+
+                except InvalidMessageTextException as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "detail": e.msg,
+                    })
+
             else:
                 await websocket.send_json({
                     "type": "error",
-                    "detail": "Unsupported event type",
+                    "detail": "Неизвестное событие",
                 })
 
     except WebSocketDisconnect:

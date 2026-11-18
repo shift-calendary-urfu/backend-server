@@ -680,7 +680,7 @@ class ChatServices:
                 )
 
                 if employee is None:
-                    raise ChatReadOnlyException("Работник не найден")
+                    raise ChatReadOnlyException("Чат только для чтения")
 
         message = Message(
             chat_id=chat_id,
