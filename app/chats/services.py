@@ -655,7 +655,7 @@ class ChatServices:
         )
 
         if chat is None:
-            logger.warning("Чат не найден, user_id=%d", user_id)
+            logger.warning("Чат не найден, chat_id=%d", chat_id)
             raise ChatNotFoundException("Чат не найден")
 
         if chat.type == ChatType.WORKPLACE:
@@ -722,6 +722,7 @@ class ChatServices:
         )
 
         if chat is None:
+            logger.warning("Чат не найден, chat_id=%d", chat_id)
             raise ChatNotFoundException("Чат не найден")
 
         query = (
@@ -739,6 +740,7 @@ class ChatServices:
             )
 
             if workplace is None:
+                logger.warning("Для рабочей точки не найден чат, chat_id=%d", chat_id)
                 raise ChatNotFoundException("Рабочая точка не найдена")
 
             is_active_employee = exists(
@@ -755,5 +757,7 @@ class ChatServices:
                     is_active_employee,
                 )
             )
+
+        logger.info("Пользователи чата получены, chat_id=%d", chat_id)
 
         return list(await self.db.scalars(query))
