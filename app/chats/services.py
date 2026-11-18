@@ -5,7 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chats.models import Chat, ChatMember, Message
 from app.chats.models.chat import ChatType
-from app.chats.schemas import ChatListItem, DirectChatResponse
+from app.chats.schemas import (
+    ChatListItem, 
+    DirectChatResponse,
+    MessageHistoryResponse, 
+    MessageResponse,
+)
 
 from app.employees.model import Employee
 
@@ -515,3 +520,58 @@ class ChatServices:
             raise ChatNotFoundException("Чат не найден")
 
         return ChatListItem.model_validate(dict(chat))
+
+
+    async def get_messages(
+        self,
+        chat_id: int,
+        user_id: int,
+        limit: int = 50,
+        before_id: int | None = None,
+    ) -> MessageHistoryResponse:
+        await self.get_chat(chat_id=chat_id, user_id=user_id)
+
+        sender_name = case(
+            (
+                Message.sender_id.is_(None),
+                "Удалённый пользователь",
+            ),
+            else_=func.concat_ws(
+                " ",
+                User.first_name,
+                User.second_name,
+                User.third_name,
+            ),
+        ).label("sender_name")
+
+        stmt = (
+            select(
+                Message.id,
+                Message.chat_id,
+                Message.sender_id,
+                sender_name,
+                Message.text,
+                Message.created_at,
+            )
+            .outerjoin(User, User.id == Message.sender_id)
+            .where(Message.chat_id == chat_id)
+            .order_by(Message.id.desc())
+            .limit(limit)
+        )
+
+        if before_id is not None:
+            stmt = stmt.where(Message.id < before_id)
+
+        result = await self.db.execute(stmt)
+        messages = result.mappings().all()
+
+        logger.info("Получены сообщения (chat_id=%d, count=%d) для user_id=%d", 
+                    chat_id, len(messages), user_id
+                )
+
+        return MessageHistoryResponse(
+            messages=[
+                MessageResponse.model_validate(dict(message))
+                for message in reversed(messages)
+            ]
+        )
