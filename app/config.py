@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "123456789"
     JWT_ALGORITHM:str = "HS256"
 
+    GIGA_API_KEY: str = "MDE5YWJhYjctYmUxMC03ZDNhLWE3NDYtZDBjMTQ1MmMwZjQ1OmViYjg0ZDUyLWY3NDAtNGQ2Yy1iM2I5LTYwZmQ1MTc0MTAyZQ=="
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8",
