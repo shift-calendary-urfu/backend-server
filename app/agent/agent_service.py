@@ -74,6 +74,14 @@ class AgentServiceError(RuntimeError):
     pass
 
 
+UNSUPPORTED_CALENDAR_REQUEST_ANSWER = (
+    "Я могу работать только с доступными сейчас операциями календаря смен: "
+    "вывести ваши рабочие точки или подготовить изменение рабочей точки "
+    "с последующим подтверждением. Запрошенную информацию пока можно получить "
+    "только вручную."
+)
+
+
 class AgentService:
     def __init__(self, db: AsyncSession, user: User):
         self.db = db
@@ -97,8 +105,19 @@ class AgentService:
             {
                 "role": "system",
                 "content": (
-                    "Ты помощник календаря смен. Используй tool "
-                    "list_my_workplaces для чтения рабочих точек и "
+                    "Ты помощник календаря смен. Отвечай только на вопросы, "
+                    "связанные с календарем смен и рабочими точками. На вопросы "
+                    "не по теме (например, общие знания, погода, анекдоты, "
+                    "программирование или личные советы) не отвечай по существу: "
+                    "вежливо сообщи, что помогаешь только с календарем смен. "
+                    "Если вопрос связан с календарем смен, но для него нет "
+                    "подходящего доступного tool (например, запрос информации "
+                    "о сотруднике), не выдумывай данные и не вызывай неизвестные "
+                    "tools. Сообщи, что такую операцию пока можно выполнить "
+                    "только вручную, и перечисли доступные возможности: вывести "
+                    "рабочие точки пользователя или подготовить изменение "
+                    "рабочей точки с последующим подтверждением. "
+                    "Используй tool list_my_workplaces для чтения рабочих точек и "
                     "update_workplace только для подготовки изменения рабочей точки. "
                     "Никогда не представляй подготовленное изменение как выполненное. "
                     "Для создания и удаления не вызывай tools; сообщи, что действие "
@@ -143,6 +162,26 @@ class AgentService:
             function = tool_call.get("function") or {}
             function_name = function.get("name")
             if function_name not in {"list_my_workplaces", "update_workplace"}:
+                tool_messages.append(
+                    {
+                        "role": "tool",
+                        "content": json.dumps(
+                            {
+                                "error": (
+                                    "Эта операция пока недоступна. "
+                                    "Доступны только list_my_workplaces и "
+                                    "подготовка update_workplace."
+                                )
+                            },
+                            ensure_ascii=False,
+                        ),
+                        **(
+                            {"tool_call_id": tool_call.get("id")}
+                            if tool_call.get("id")
+                            else {}
+                        ),
+                    }
+                )
                 continue
 
             try:
@@ -241,7 +280,7 @@ class AgentService:
             executed = True
 
         if not executed:
-            raise AgentServiceError("GigaChat вызвал неизвестный tool")
+            return AgentAnswer(answer=UNSUPPORTED_CALENDAR_REQUEST_ANSWER)
 
         messages.append(assistant_message)
         messages.extend(tool_messages)
