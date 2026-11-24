@@ -1,5 +1,5 @@
 from datetime import time
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -63,3 +63,33 @@ class AgentAnswer(BaseModel):
         str,
         Field(min_length=1, description="Финальный ответ пользователя"),
     ]
+    confirmation_required: bool = False
+    confirmation_id: Annotated[str | None, Field(min_length=1)] = None
+    confirmation_summary: Annotated[str | None, Field(min_length=1)] = None
+
+
+class WorkplaceMutationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workplace_id: Annotated[int | None, Field(default=None, ge=1)]
+    name: Annotated[str | None, Field(default=None, max_length=255)]
+    address: Annotated[str | None, Field(default=None, max_length=500)]
+    phone: Annotated[str | None, Field(default=None, max_length=20)]
+    description: Annotated[str | None, Field(default=None, max_length=5000)]
+    workplace_type: Annotated[str | None, Field(default=None, max_length=50)]
+    work_start_time: Annotated[str | None, Field(default=None)]
+    work_end_time: Annotated[str | None, Field(default=None)]
+
+
+class AgentConfirmationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation_id: Annotated[str, Field(min_length=1)]
+    approved: bool
+
+
+class AgentConfirmationAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["executed", "cancelled", "expired", "invalid"]
+    answer: Annotated[str, Field(min_length=1)]
