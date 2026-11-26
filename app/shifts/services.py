@@ -38,6 +38,7 @@ from app.exceptions import (
 
 import calendar
 import datetime as dt
+import re
 
 
 logger=get_logger(__name__)
@@ -49,6 +50,43 @@ MINUTES_IN_DAY = 24 * 60
 # Допустимый диапазон лет для отчёта
 MIN_REPORT_YEAR = 2000
 MAX_REPORT_YEAR = 2100
+
+
+def build_schedule_dates(
+    schedule: str | None,
+    period: int,
+    start_date: dt.date,
+) -> tuple[list[dt.date], str, bool]:
+    """Рассчитывает рабочие даты цикла от начальной даты включительно.
+
+    Формат цикла — ``рабочие/выходные``. Первый день считается рабочим;
+    ``period`` задаёт количество календарных дней цикла. Если расписание
+    отсутствует, имеет неверный формат или содержит меньше одного рабочего дня,
+    возвращается только начальная дата, а флаг показывает, что цикл не применён.
+
+    Args:
+        schedule: Строка цикла, например ``5/2`` или ``7/0``, либо ``None``.
+        period: Количество календарных дней для расчёта.
+        start_date: Первый день периода и первый день рабочего цикла.
+
+    Returns:
+        Список дат смен, описание эффективного графика и флаг применения цикла.
+    """
+    match = re.fullmatch(r"(\d+)/(\d+)", schedule.strip()) if schedule else None
+    if match is None:
+        return [start_date], "не задан или некорректен — одна смена", False
+
+    work_days, off_days = (int(value) for value in match.groups())
+    if work_days < 1:
+        return [start_date], "некорректен — одна смена", False
+
+    dates: list[dt.date] = []
+    cycle_length = work_days + off_days
+    for day_offset in range(period):
+        if day_offset % cycle_length < work_days:
+            dates.append(start_date + dt.timedelta(days=day_offset))
+
+    return dates, f"{work_days}/{off_days}", True
 
 
 def _to_minutes(value: dt.time) -> int:
@@ -238,6 +276,233 @@ class ShiftServices:
         )
         
         return await self.get_shift_by_id(shift.id, workplace_id)
+
+
+    async def prepare_schedule(
+        self,
+        workplace_id: int,
+        employee_id: int,
+        schedule: str | None,
+        period: int,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict:
+        """Готовит проверенный план смен, не записывая его в базу данных.
+
+        Использует даты из ``build_schedule_dates`` и часы рабочей точки, если
+        оба переопределения времени не переданы. Существующие активные смены
+        выбранного сотрудника на планируемые даты исключаются из плана. В
+        возвращаемом ``summary`` указываются сотрудник, точка, фактический
+        период, эффективный цикл, время и число смен; этот текст предназначен
+        для показа до подтверждения пользователя.
+
+        Args:
+            workplace_id: Идентификатор активной рабочей точки.
+            employee_id: Идентификатор активного сотрудника этой точки.
+            schedule: Цикл рабочих и выходных дней; некорректное значение
+                приводит к плану из одной смены на сегодня.
+            period: Количество календарных дней цикла (1–90 проверяется схемой).
+            start_time: Необязательное время начала; по умолчанию открытие точки.
+            end_time: Необязательное время окончания; по умолчанию закрытие точки.
+
+        Returns:
+            Словарь с ``workplace_id``, ``employee_id``, сериализованным списком
+            ``shifts``, ``skipped_dates`` и человекочитаемым ``summary``.
+
+        Raises:
+            WorkplaceNotFoundException: Если точка отсутствует или неактивна.
+            EmployeeNotFoundException: Если сотрудник отсутствует, неактивен
+                или не относится к этой точке.
+            ValidationError: Если время смен не проходит проверки ``ShiftCreate``.
+        """
+        workplace = await self.db.scalar(
+            select(WorkplaceModel).where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active,
+            )
+        )
+        if workplace is None:
+            raise WorkplaceNotFoundException("Workplace not found or not active")
+
+        employee_result = await self.db.execute(
+            select(
+                EmployeeModel,
+                UserModel.first_name,
+                UserModel.second_name,
+                UserModel.third_name,
+            )
+            .join(UserModel, UserModel.id == EmployeeModel.user_id)
+            .where(
+                EmployeeModel.id == employee_id,
+                EmployeeModel.workplace_id == workplace_id,
+                EmployeeModel.is_active,
+            )
+        )
+        employee_row = employee_result.one_or_none()
+        if employee_row is None:
+            raise EmployeeNotFoundException("Employee not found or not active")
+
+        employee, first_name, second_name, third_name = employee_row
+        dates, effective_schedule, schedule_applied = build_schedule_dates(
+            schedule,
+            period,
+            dt.date.today(),
+        )
+        shift_start = start_time or workplace.work_start_time.strftime("%H:%M")
+        shift_end = end_time or workplace.work_end_time.strftime("%H:%M")
+        shifts = []
+        for shift_date in dates:
+            shift = ShiftCreate(
+                employee_id=employee_id,
+                date=shift_date,
+                start_time=shift_start,
+                end_time=shift_end,
+            )
+            shifts.append(
+                {
+                    "employee_id": employee_id,
+                    "date": shift.date.isoformat(),
+                    "start_time": shift.start_time.strftime("%H:%M"),
+                    "end_time": shift.end_time.strftime("%H:%M"),
+                    "notes": shift.notes,
+                }
+            )
+
+        existing_dates = set(
+            (
+                await self.db.scalars(
+                    select(ShiftModel.date).where(
+                        ShiftModel.workplace_id == workplace_id,
+                        ShiftModel.employee_id == employee_id,
+                        ShiftModel.date.in_(dates),
+                        ShiftModel.is_active,
+                        ShiftModel.status != "cancelled",
+                    )
+                )
+            ).all()
+        )
+        skipped_dates = sorted(existing_dates)
+        planned_shifts = [
+            shift for shift in shifts
+            if dt.date.fromisoformat(shift["date"]) not in existing_dates
+        ]
+
+        employee_name = " ".join(
+            part for part in (first_name, second_name, third_name) if part
+        )
+        period_end = (
+            dates[0] + dt.timedelta(days=period - 1)
+            if schedule_applied
+            else dates[0]
+        )
+        period_description = (
+            f"{period} календарных дней ({dates[0]:%d.%m.%Y}–{period_end:%d.%m.%Y})"
+            if schedule_applied
+            else (
+                f"1 день ({dates[0]:%d.%m.%Y}; запрошенный period={period} "
+                "не применяется без корректного schedule)"
+            )
+        )
+        summary = (
+            f"Сотрудник: {employee_name} (ID {employee_id}); "
+            f"рабочая точка: «{workplace.name}» (ID {workplace_id}); "
+            f"период: {period_description}; "
+            f"график: {effective_schedule}; "
+            f"время смен: {shift_start}–{shift_end}; "
+            f"новых смен: {len(planned_shifts)}."
+        )
+        if skipped_dates:
+            skipped = ", ".join(date.strftime("%d.%m.%Y") for date in skipped_dates)
+            summary += f" Пропустить даты с существующими сменами: {skipped}."
+
+        return {
+            "workplace_id": workplace_id,
+            "employee_id": employee.id,
+            "shifts": planned_shifts,
+            "skipped_dates": [date.isoformat() for date in skipped_dates],
+            "summary": summary,
+        }
+
+
+    async def create_scheduled_shifts(
+        self,
+        workplace_id: int,
+        employee_id: int,
+        shifts: list[ShiftCreate],
+    ) -> tuple[int, list[dt.date]]:
+        """Создаёт подтверждённые смены, пропуская даты с уже активными сменами.
+
+        Перед записью повторно проверяет активность рабочей точки и сотрудника,
+        блокирует запись сотрудника на время операции и повторно ищет конфликты,
+        чтобы учесть смены, появившиеся после подготовки плана. Все новые смены
+        добавляются и фиксируются одним commit; при пустом списке запрос ничего
+        не записывает.
+
+        Args:
+            workplace_id: Идентификатор рабочей точки для создаваемых смен.
+            employee_id: Активный сотрудник этой рабочей точки.
+            shifts: Подтверждённые и предварительно провалидированные данные смен.
+
+        Returns:
+            Количество созданных смен и отсортированные даты, пропущенные из-за
+            существующих активных смен.
+
+        Raises:
+            WorkplaceNotFoundException: Если рабочая точка отсутствует или неактивна.
+            EmployeeNotFoundException: Если сотрудник отсутствует, неактивен
+                или относится к другой точке.
+        """
+        workplace_exists = await self.db.scalar(
+            select(WorkplaceModel.id).where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active,
+            )
+        )
+        if workplace_exists is None:
+            raise WorkplaceNotFoundException("Workplace not found or not active")
+
+        employee = await self.db.scalar(
+            select(EmployeeModel)
+            .where(
+                EmployeeModel.id == employee_id,
+                EmployeeModel.workplace_id == workplace_id,
+                EmployeeModel.is_active,
+            )
+            .with_for_update()
+        )
+        if employee is None:
+            raise EmployeeNotFoundException("Employee not found or not active")
+
+        dates = [shift.date for shift in shifts]
+        existing_dates: set[dt.date] = set()
+        if dates:
+            existing_dates = set(
+                (
+                    await self.db.scalars(
+                        select(ShiftModel.date).where(
+                            ShiftModel.workplace_id == workplace_id,
+                            ShiftModel.employee_id == employee_id,
+                            ShiftModel.date.in_(dates),
+                            ShiftModel.is_active,
+                            ShiftModel.status != "cancelled",
+                        )
+                    )
+                ).all()
+            )
+
+        new_shifts = [
+            ShiftModel(
+                workplace_id=workplace_id,
+                **shift.model_dump(),
+            )
+            for shift in shifts
+            if shift.date not in existing_dates
+        ]
+        if new_shifts:
+            self.db.add_all(new_shifts)
+            await self.db.commit()
+
+        return len(new_shifts), sorted(existing_dates)
 
 
     async def update_shift(

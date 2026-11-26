@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import date, time, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -8,9 +8,11 @@ from app.agent.schemas import (
     AgentAnswer,
     ListMyWorkplacesRequest,
     ListMyWorkplacesResponse,
+    ShiftScheduleRequest,
 )
 from app.agent.agent_service import AgentService
 from app.employees.model import Employee
+from app.shifts.services import build_schedule_dates
 from app.users.model import User
 from app.workplaces.model import Workplace
 
@@ -104,6 +106,69 @@ def test_agent_workplace_schemas_validate_request_and_orm_summary():
 def test_agent_workplace_request_rejects_empty_query():
     with pytest.raises(ValueError):
         ListMyWorkplacesRequest(query="   ")
+
+
+def test_shift_schedule_dates_follow_cycle_and_fallback_rules():
+    start = date(2026, 11, 26)
+
+    dates, schedule_name, schedule_applied = build_schedule_dates("5/2", 10, start)
+    assert dates == [
+        start + timedelta(days=offset)
+        for offset in (0, 1, 2, 3, 4, 7, 8, 9)
+    ]
+    assert schedule_name == "5/2"
+    assert schedule_applied is True
+
+    dates, schedule_name, schedule_applied = build_schedule_dates("2/1", 6, start)
+    assert dates == [
+        start,
+        start + timedelta(days=1),
+        start + timedelta(days=3),
+        start + timedelta(days=4),
+    ]
+    assert schedule_applied is True
+
+    dates, schedule_name, schedule_applied = build_schedule_dates("0/2", 30, start)
+    assert dates == [start]
+    assert schedule_name == "некорректен — одна смена"
+    assert schedule_applied is False
+
+    dates, _, schedule_applied = build_schedule_dates("bad", 30, start)
+    assert dates == [start]
+    assert schedule_applied is False
+
+
+def test_shift_schedule_request_requires_paired_time_overrides():
+    request = ShiftScheduleRequest(
+        workplace_id=1,
+        employee_id=2,
+        period=30,
+        schedule="5/2",
+    )
+    assert request.start_time is None
+
+    with pytest.raises(ValueError):
+        ShiftScheduleRequest(
+            workplace_id=1,
+            employee_id=2,
+            period=30,
+            start_time="09:00",
+        )
+
+    for start_time, end_time in (("09:15", "18:00"), ("18:00", "09:00")):
+        with pytest.raises(ValueError):
+            ShiftScheduleRequest(
+                workplace_id=1,
+                employee_id=2,
+                period=30,
+                start_time=start_time,
+                end_time=end_time,
+            )
+
+    assert all(
+        field.description
+        for field in ShiftScheduleRequest.model_fields.values()
+    )
 
 
 @pytest.mark.asyncio

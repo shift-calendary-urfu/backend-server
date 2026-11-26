@@ -4,11 +4,18 @@ from secrets import token_urlsafe
 from typing import Literal
 
 
-ActionName = Literal["create_workplace", "update_workplace", "delete_workplace"]
+ActionName = Literal[
+    "create_workplace",
+    "update_workplace",
+    "delete_workplace",
+    "create_shifts",
+]
 
 
 @dataclass(frozen=True)
 class PendingAction:
+    """Одноразовое действие, которое ожидает подтверждения пользователя."""
+
     id: str
     user_id: int
     action: ActionName
@@ -29,6 +36,19 @@ def create_pending_action(
     summary: str,
     workplace_id: int | None = None,
 ) -> PendingAction:
+    """Сохраняет действие для подтверждения его владельцем в течение 10 минут.
+
+    Args:
+        user_id: ID пользователя, которому разрешено подтвердить или отменить
+            действие.
+        action: Тип ожидающей операции, включая создание графика смен.
+        payload: Данные для исполнения после подтверждения.
+        summary: Текст плана, который показывается пользователю до подтверждения.
+        workplace_id: Рабочая точка, затронутая действием, если она есть.
+
+    Returns:
+        Сохранённое действие с криптографически случайным ID и временем истечения.
+    """
     now = datetime.now(timezone.utc)
     pending = PendingAction(
         id=token_urlsafe(32),
@@ -47,6 +67,20 @@ def consume_pending_action(
     confirmation_id: str,
     user_id: int,
 ) -> tuple[PendingAction | None, Literal["ok", "expired", "invalid"]]:
+    """Однократно извлекает ожидающее действие для его выполнения.
+
+    Чужие и неизвестные ID возвращают ``invalid`` без раскрытия владельца.
+    Просроченное действие удаляется и возвращается со статусом ``expired``;
+    успешно подтверждённое действие удаляется до передачи вызывающему коду.
+
+    Args:
+        confirmation_id: Одноразовый идентификатор из ответа агента.
+        user_id: ID текущего аутентифицированного пользователя.
+
+    Returns:
+        Пара из действия (или ``None``) и результата ``ok``, ``expired`` либо
+        ``invalid``.
+    """
     pending = _pending.get(confirmation_id)
     if pending is None:
         return None, "invalid"
@@ -60,6 +94,15 @@ def consume_pending_action(
 
 
 def cancel_pending_action(confirmation_id: str, user_id: int) -> bool:
+    """Отменяет ещё действующее действие, если оно принадлежит пользователю.
+
+    Args:
+        confirmation_id: Одноразовый идентификатор из ответа агента.
+        user_id: ID пользователя, запросившего отмену.
+
+    Returns:
+        ``True``, если действие найдено, не истекло и удалено; иначе ``False``.
+    """
     pending = _pending.get(confirmation_id)
     if pending is None or pending.user_id != user_id:
         return False

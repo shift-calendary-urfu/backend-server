@@ -7,6 +7,32 @@ class GigaChatRequestError(RuntimeError):
     pass
 
 
+def _to_gigachat_functions(tools: list[dict]) -> list[dict]:
+    """Преобразует OpenAI-совместимые описания tools в формат функций GigaChat v1."""
+    functions = []
+    for tool in tools:
+        function = tool.get("function")
+        if not isinstance(function, dict):
+            raise GigaChatRequestError("Описание tool имеет неверный формат")
+        functions.append(function)
+    return functions
+
+
+def _to_gigachat_function_choice(tool_choice: str | dict) -> str | dict:
+    """Преобразует выбор tool в поле function_call API GigaChat v1."""
+    if isinstance(tool_choice, str):
+        if tool_choice == "required":
+            return "auto"
+        return tool_choice
+
+    function = tool_choice.get("function")
+    if tool_choice.get("type") == "function" and isinstance(function, dict):
+        name = function.get("name")
+        if isinstance(name, str) and name:
+            return {"name": name}
+    raise GigaChatRequestError("Выбор tool имеет неверный формат")
+
+
 async def send_gigachat_request(
     token: str,
     messages: list[dict],
@@ -15,7 +41,10 @@ async def send_gigachat_request(
     tool_choice: str | dict | None = None,
 ) -> dict:
     """
-    Отправляет запрос в GigaChat с полученным OAuth-токеном.
+    Отправляет запрос в GigaChat v1 с полученным OAuth-токеном.
+
+    Описания tool преобразуются в поле ``functions``, а ``tool_choice`` — в
+    ``function_call`` согласно контракту API GigaChat v1.
     """
     if not token:
         raise GigaChatRequestError("OAuth-токен GigaChat не задан")
@@ -31,9 +60,9 @@ async def send_gigachat_request(
         "stream": False,
     }
     if tools:
-        payload["tools"] = tools
+        payload["functions"] = _to_gigachat_functions(tools)
     if tool_choice:
-        payload["tool_choice"] = tool_choice
+        payload["function_call"] = _to_gigachat_function_choice(tool_choice)
 
     try:
         async with httpx.AsyncClient(

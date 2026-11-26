@@ -7,6 +7,7 @@ from app.users.model import User
 
 
 def _admin_or_owner_role(workplace: Workplace, user: User, employee: Employee | None) -> str:
+    """Определяет роль пользователя для активной рабочей точки."""
     if workplace.owner_id == user.id:
         return "owner"
     if employee is not None and employee.role == "admin":
@@ -21,6 +22,7 @@ async def get_workplace_access(
     user: User,
     workplace_id: int,
 ) -> str:
+    """Возвращает роль пользователя в активной точке или ``none`` без доступа."""
     workplace = await db.scalar(
         select(Workplace).where(
             Workplace.id == workplace_id,
@@ -48,3 +50,12 @@ def can_mutate_workplace(role: str, action: str) -> bool:
     if action == "create_workplace":
         return True
     return False
+
+
+def can_manage_shifts(role: str) -> bool:
+    """Возвращает, может ли роль составлять смены в рабочей точке.
+
+    Создание расписания разрешено владельцу и администратору точки; обычный
+    сотрудник может просматривать смены, но не планировать и создавать их.
+    """
+    return role in {"owner", "admin"}
