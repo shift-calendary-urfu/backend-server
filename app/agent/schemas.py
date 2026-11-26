@@ -1,5 +1,6 @@
 """Pydantic-схемы запросов и ответов агента."""
 
+from datetime import date as dt_date
 from datetime import time
 from datetime import datetime
 from typing import Annotated, Literal
@@ -79,6 +80,168 @@ class ListMyWorkplacesResponse(BaseModel):
     @property
     def count(self) -> int:
         return len(self.workplaces)
+
+
+class EmployeeLookupRequest(BaseModel):
+    """Параметры поиска сотрудника для подготовки графика смен."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workplace_id: Annotated[
+        int | None,
+        Field(
+            default=None,
+            ge=1,
+            description="ID рабочей точки; можно не указывать, если у пользователя ровно одна управляемая точка.",
+        ),
+    ] = None
+    workplace_name: Annotated[
+        str | None,
+        Field(
+            default=None,
+            min_length=1,
+            max_length=255,
+            description="Название точки, если пользователь выбрал её по названию.",
+        ),
+    ] = None
+    full_name: Annotated[
+        str | None,
+        Field(default=None, min_length=1, max_length=500, description="ФИО или часть ФИО сотрудника."),
+    ] = None
+    phone: Annotated[
+        str | None,
+        Field(default=None, min_length=1, max_length=32, description="Телефон сотрудника."),
+    ] = None
+
+    @model_validator(mode="after")
+    def validate_lookup_fields(self) -> "EmployeeLookupRequest":
+        if (self.full_name is None) == (self.phone is None):
+            raise ValueError("Укажите ровно одно из полей full_name или phone")
+        if self.workplace_id is not None and self.workplace_name is not None:
+            raise ValueError("Укажите workplace_id или workplace_name, но не оба поля")
+        if self.full_name is not None and not self.full_name.strip():
+            raise ValueError("ФИО не может быть пустым")
+        if self.phone is not None and not self.phone.strip():
+            raise ValueError("Телефон не может быть пустым")
+        if self.workplace_name is not None and not self.workplace_name.strip():
+            raise ValueError("Название рабочей точки не может быть пустым")
+        return self
+
+
+class EmployeeLookupWorkplace(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    id: Annotated[int, Field(ge=1)]
+    name: Annotated[str, Field(max_length=255)]
+
+
+class EmployeeLookupMatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    employee_id: Annotated[int, Field(ge=1, description="ID сотрудника для создания графика.")]
+    full_name: Annotated[str, Field(description="ФИО сотрудника для различения совпадений.")]
+
+
+class EmployeeLookupResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["matches", "not_found", "workplace_required"]
+    workplace: EmployeeLookupWorkplace | None = None
+    workplaces: list[EmployeeLookupWorkplace] = Field(default_factory=list)
+    employees: list[EmployeeLookupMatch] = Field(default_factory=list)
+
+
+class EmployeeShiftsRequest(BaseModel):
+    """Параметры просмотра смен сотрудника или текущего пользователя."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    employee_id: Annotated[int | None, Field(default=None, ge=1)]
+    workplace_id: Annotated[int | None, Field(default=None, ge=1)]
+    date_from: dt_date | None = None
+    date_to: dt_date | None = None
+
+    @model_validator(mode="after")
+    def validate_period(self) -> "EmployeeShiftsRequest":
+        if (self.date_from is None) != (self.date_to is None):
+            raise ValueError("Укажите обе даты периода: date_from и date_to")
+        if self.date_from is not None and self.date_to is not None:
+            period_days = (self.date_to - self.date_from).days + 1
+            if period_days < 1:
+                raise ValueError("date_to должна быть не раньше date_from")
+            if period_days > 90:
+                raise ValueError("Период просмотра смен сотрудника не может превышать 90 дней")
+        return self
+
+
+class WorkplaceShiftsRequest(BaseModel):
+    """Параметры просмотра смен всех сотрудников рабочей точки."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workplace_id: Annotated[int | None, Field(default=None, ge=1)]
+    workplace_name: Annotated[
+        str | None,
+        Field(default=None, min_length=1, max_length=255),
+    ] = None
+    date_from: dt_date | None = None
+    date_to: dt_date | None = None
+
+    @model_validator(mode="after")
+    def validate_period_and_workplace(self) -> "WorkplaceShiftsRequest":
+        if self.workplace_id is not None and self.workplace_name is not None:
+            raise ValueError("Укажите workplace_id или workplace_name, но не оба поля")
+        if self.workplace_name is not None and not self.workplace_name.strip():
+            raise ValueError("Название рабочей точки не может быть пустым")
+        if (self.date_from is None) != (self.date_to is None):
+            raise ValueError("Укажите обе даты периода: date_from и date_to")
+        if self.date_from is not None and self.date_to is not None:
+            period_days = (self.date_to - self.date_from).days + 1
+            if period_days < 1:
+                raise ValueError("date_to должна быть не раньше date_from")
+            if period_days > 30:
+                raise ValueError("Период просмотра смен рабочей точки не может превышать 30 дней")
+        return self
+
+
+class AgentShiftItem(BaseModel):
+    """Смена в ответе инструмента агента."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    workplace_id: int
+    employee_id: int
+    employee_name: str
+    date: dt_date
+    start_time: str
+    end_time: str
+    status: str
+    notes: str | None = None
+
+
+class EmployeeShiftsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["shifts", "no_shifts", "not_found", "workplace_required"]
+    employee_id: int | None = None
+    employee_name: str | None = None
+    workplace: EmployeeLookupWorkplace | None = None
+    workplaces: list[EmployeeLookupWorkplace] = Field(default_factory=list)
+    date_from: dt_date
+    date_to: dt_date
+    shifts: list[AgentShiftItem] = Field(default_factory=list)
+
+
+class WorkplaceShiftsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["shifts", "no_shifts", "workplace_required"]
+    workplace: EmployeeLookupWorkplace | None = None
+    workplaces: list[EmployeeLookupWorkplace] = Field(default_factory=list)
+    date_from: dt_date
+    date_to: dt_date
+    shifts: list[AgentShiftItem] = Field(default_factory=list)
 
 
 class AgentAnswer(BaseModel):
