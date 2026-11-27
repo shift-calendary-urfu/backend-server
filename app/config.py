@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "123456789"
     JWT_ALGORITHM:str = "HS256"
 
+    GIGA_API_KEY: str = "key"
+    GIGA_AUTH_URL: str = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+    GIGA_CHAT_URL: str = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+    GIGA_MODEL: str = "GigaChat"
+    GIGA_TIMEOUT_SECONDS: float = 30
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8",

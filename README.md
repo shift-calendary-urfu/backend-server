@@ -89,6 +89,7 @@ CORS_ORIGINS=["http://localhost:3000","http://localhost:3001"]
 
 SECRET_KEY=123456789
 JWT_ALG=algorithm
+GIGA_API_KEY=ВАШ_ГИГА_АПИ_КЛЮЧ
 ```
 
 ## Запуск базы данных и сервера
