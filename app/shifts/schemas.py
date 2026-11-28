@@ -264,3 +264,119 @@ class CalendarReportResponse(BaseModel):
             ]
         }
     )
+
+
+class EmployeeShiftReportItem(BaseModel):
+    """
+    Одна отработанная смена в отчёте по сотруднику.
+    """
+    shift_id: Annotated[int, Field(
+        ge=1,
+        description="ID смены"
+    )]
+    date: Annotated[dt.date, Field(
+        description="Дата смены"
+    )]
+    start_time: Annotated[dt.time, Field(
+        description="Время начала смены"
+    )]
+    end_time: Annotated[dt.time, Field(
+        description="Время окончания смены"
+    )]
+    hours: Annotated[float, Field(
+        ge=0,
+        description="Длительность смены в часах"
+    )]
+    is_full_shift: Annotated[bool, Field(
+        description="Полная смена (от открытия до закрытия рабочей точки)"
+    )]
+    notes: Annotated[str | None, Field(
+        default=None,
+        description="Примечание к смене"
+    )]
+
+
+class EmployeeReportResponse(BaseModel):
+    """
+    Отчёт по сотруднику рабочей точки за месяц.
+    Для текущего месяца учитываются смены только по сегодняшний день включительно.
+    """
+    employee_id: Annotated[int, Field(
+        ge=1,
+        description="ID работника"
+    )]
+    full_name: Annotated[str, Field(
+        description="ФИО работника"
+    )]
+    workplace_id: Annotated[int, Field(
+        ge=1,
+        description="ID рабочего пространства"
+    )]
+    period: Annotated[str, Field(
+        pattern=r"^\d{4}-\d{2}$",
+        description="Период отчёта в формате YYYY-MM"
+    )]
+    date_from: Annotated[dt.date, Field(
+        description="Первый день периода"
+    )]
+    date_to: Annotated[dt.date, Field(
+        description="Последний учтённый день: конец месяца или сегодня, если месяц ещё идёт"
+    )]
+    total_hours: Annotated[float, Field(
+        ge=0,
+        description="Отработано часов за период"
+    )]
+    total_shifts: Annotated[int, Field(
+        ge=0,
+        description="Количество отработанных смен за период"
+    )]
+    full_shifts_count: Annotated[int, Field(
+        ge=0,
+        description="Количество полных смен"
+    )]
+    full_shifts_hours: Annotated[float, Field(
+        ge=0,
+        description="Количество часов в полных сменах"
+    )]
+    shifts: Annotated[list[EmployeeShiftReportItem], Field(
+        description="Отработанные смены по датам"
+    )]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "employee_id": 1,
+                    "full_name": "Иванов Иван Иванович",
+                    "workplace_id": 1,
+                    "period": "2026-11",
+                    "date_from": "2026-11-01",
+                    "date_to": "2026-11-28",
+                    "total_hours": 21.0,
+                    "total_shifts": 2,
+                    "full_shifts_count": 1,
+                    "full_shifts_hours": 12.0,
+                    "shifts": [
+                        {
+                            "shift_id": 10,
+                            "date": "2026-11-02",
+                            "start_time": "09:00:00",
+                            "end_time": "21:00:00",
+                            "hours": 12.0,
+                            "is_full_shift": True,
+                            "notes": None
+                        },
+                        {
+                            "shift_id": 11,
+                            "date": "2026-11-03",
+                            "start_time": "09:00:00",
+                            "end_time": "18:00:00",
+                            "hours": 9.0,
+                            "is_full_shift": False,
+                            "notes": "Ушёл раньше по согласованию"
+                        }
+                    ]
+                }
+            ]
+        }
+    )

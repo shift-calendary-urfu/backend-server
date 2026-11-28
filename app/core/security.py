@@ -351,3 +351,76 @@ async def get_owner_or_employees(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="You must be the owner or employee of this workplace",
     )
+
+
+async def get_owner_admin_or_self(
+    workplace_id: int,
+    employee_id: int,
+    user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserModel:
+    """
+    Доступ к данным конкретного сотрудника точки:
+    владелец и администратор точки видят любого сотрудника,
+    работник — только себя.
+    """
+    is_owner = await db.scalar(
+        select(WorkplaceModel.id).where(
+            WorkplaceModel.id == workplace_id,
+            WorkplaceModel.owner_id == user.id,
+        )
+    )
+
+    if is_owner is not None:
+        logger.info(
+            "Пользователь является владельцем рабочего пространства, user_id=%s, workplace_id=%s",
+            user.id,
+            workplace_id
+        )
+        return user
+
+    is_admin = await db.scalar(
+        select(EmployeeModel.id).where(
+            EmployeeModel.workplace_id == workplace_id,
+            EmployeeModel.user_id == user.id,
+            EmployeeModel.role == "admin",
+            EmployeeModel.is_active,
+        )
+    )
+
+    if is_admin is not None:
+        logger.info(
+            "Пользователь является администратором рабочего пространства, user_id=%s, workplace_id=%s",
+            user.id,
+            workplace_id
+        )
+        return user
+
+    is_self = await db.scalar(
+        select(EmployeeModel.id).where(
+            EmployeeModel.id == employee_id,
+            EmployeeModel.workplace_id == workplace_id,
+            EmployeeModel.user_id == user.id,
+            EmployeeModel.is_active,
+        )
+    )
+
+    if is_self is not None:
+        logger.info(
+            "Пользователь запрашивает свои данные, user_id=%s, employee_id=%s, workplace_id=%s",
+            user.id,
+            employee_id,
+            workplace_id
+        )
+        return user
+
+    logger.info(
+        "Нет доступа к данным сотрудника, user_id=%s, employee_id=%s, workplace_id=%s",
+        user.id,
+        employee_id,
+        workplace_id
+    )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You must be the owner or admin of this workplace, or this employee",
+    )

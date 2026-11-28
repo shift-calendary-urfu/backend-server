@@ -10,7 +10,9 @@ from app.shifts.schemas import (
     ShiftsDuplicate,
     ShiftsDuplicateResponse,
     CalendarReportResponse,
-    EmployeeReportItem
+    EmployeeReportItem,
+    EmployeeReportResponse,
+    EmployeeShiftReportItem
 )
 from app.shifts.model import Shift as ShiftModel
 
@@ -76,6 +78,30 @@ def _shift_bounds(start_time: dt.time, end_time: dt.time) -> tuple[int, int]:
 
 def _minutes_to_hours(minutes: int) -> float:
     return round(minutes / 60, 2)
+
+
+def _validate_report_period(month: int, year: int) -> None:
+    """
+    Проверяет месяц и год отчёта, при ошибке выбрасывает InvalidReportPeriodException.
+    """
+    if not 1 <= month <= 12:
+        logger.warning("Некорректный месяц для отчёта: month=%s", month)
+        raise InvalidReportPeriodException(
+            "Month must be between 1 and 12"
+        )
+
+    if not MIN_REPORT_YEAR <= year <= MAX_REPORT_YEAR:
+        logger.warning("Некорректный год для отчёта: year=%s", year)
+        raise InvalidReportPeriodException(
+            f"Year must be between {MIN_REPORT_YEAR} and {MAX_REPORT_YEAR}"
+        )
+
+
+def _today() -> dt.date:
+    """
+    Сегодняшняя дата. Вынесена в функцию, чтобы в тестах её можно было подменить.
+    """
+    return dt.date.today()
 
 
 def _full_name(employee: EmployeeModel) -> str:
@@ -551,17 +577,7 @@ class ShiftServices:
             workplace_id, month, year
         )
 
-        if not 1 <= month <= 12:
-            logger.warning("Некорректный месяц для отчёта: month=%s", month)
-            raise InvalidReportPeriodException(
-                "Month must be between 1 and 12"
-            )
-
-        if not MIN_REPORT_YEAR <= year <= MAX_REPORT_YEAR:
-            logger.warning("Некорректный год для отчёта: year=%s", year)
-            raise InvalidReportPeriodException(
-                f"Year must be between {MIN_REPORT_YEAR} and {MAX_REPORT_YEAR}"
-            )
+        _validate_report_period(month, year)
 
         workplace = await self.db.scalar(
             select(WorkplaceModel)
@@ -728,3 +744,135 @@ class ShiftServices:
             filename=f"report_{workplace_id}_{report.period}.xlsx",
             content=content,
         )
+
+
+    async def get_employee_report(
+        self,
+        workplace_id: int,
+        employee_id: int,
+        month: int,
+        year: int,
+    ) -> EmployeeReportResponse:
+        """
+        Составляет отчёт по сотруднику рабочей точки за месяц:
+        список отработанных смен с примечаниями и итоги.
+
+        Учитываются только смены по сегодняшний день включительно:
+        для текущего месяца — с 1-го числа по сегодня, для прошлых — весь месяц,
+        для будущих месяцев список смен пустой.
+        Отменённые (status='cancelled') и удалённые смены не учитываются.
+        Часы и полные смены считаются так же, как в get_calendar_report.
+        """
+        logger.info(
+            "Составление отчёта по сотруднику: workplace_id=%s, employee_id=%s, month=%s, year=%s",
+            workplace_id, employee_id, month, year
+        )
+
+        _validate_report_period(month, year)
+
+        workplace = await self.db.scalar(
+            select(WorkplaceModel)
+            .where(
+                WorkplaceModel.id == workplace_id,
+                WorkplaceModel.is_active
+            )
+        )
+
+        if workplace is None:
+            logger.warning(
+                "Рабочая точка для отчёта не найдена или не активна, workplace_id=%s",
+                workplace_id
+            )
+            raise WorkplaceNotFoundException(
+                "Workplace not found"
+            )
+
+        # Уволенный сотрудник тоже доступен: владелец и админ могут смотреть его прошлые смены
+        employee = await self.db.scalar(
+            select(EmployeeModel)
+            .options(selectinload(EmployeeModel.user))
+            .where(
+                EmployeeModel.id == employee_id,
+                EmployeeModel.workplace_id == workplace_id
+            )
+        )
+
+        if employee is None:
+            logger.warning(
+                "Работник для отчёта не найден, employee_id=%s, workplace_id=%s",
+                employee_id, workplace_id
+            )
+            raise EmployeeNotFoundException(
+                "Employee not found"
+            )
+
+        period_start = dt.date(year, month, 1)
+        month_end = dt.date(year, month, calendar.monthrange(year, month)[1])
+        period_end = min(month_end, _today())
+
+        shifts = []
+        if period_start <= period_end:
+            shifts = (await self.db.scalars(
+                select(ShiftModel)
+                .where(
+                    ShiftModel.workplace_id == workplace_id,
+                    ShiftModel.employee_id == employee_id,
+                    ShiftModel.date >= period_start,
+                    ShiftModel.date <= period_end,
+                    ShiftModel.status != "cancelled",
+                    ShiftModel.is_active,
+                )
+                .order_by(ShiftModel.date, ShiftModel.start_time)
+            )).all()
+
+        workplace_start = _to_minutes(workplace.work_start_time)
+        workplace_end = _to_minutes(workplace.work_end_time)
+
+        total_minutes = 0
+        full_shifts_count = 0
+        full_shifts_minutes = 0
+        shift_items = []
+
+        for shift in shifts:
+            start, end = _shift_bounds(shift.start_time, shift.end_time)
+            duration = end - start
+            is_full_shift = start <= workplace_start and end >= workplace_end
+
+            total_minutes += duration
+            if is_full_shift:
+                full_shifts_count += 1
+                full_shifts_minutes += duration
+
+            shift_items.append(
+                EmployeeShiftReportItem(
+                    shift_id=shift.id,
+                    date=shift.date,
+                    start_time=shift.start_time,
+                    end_time=shift.end_time,
+                    hours=_minutes_to_hours(duration),
+                    is_full_shift=is_full_shift,
+                    notes=shift.notes,
+                )
+            )
+
+        report = EmployeeReportResponse(
+            employee_id=employee_id,
+            full_name=_full_name(employee),
+            workplace_id=workplace_id,
+            period=f"{year:04d}-{month:02d}",
+            date_from=period_start,
+            date_to=max(period_start, period_end),
+            total_hours=_minutes_to_hours(total_minutes),
+            total_shifts=len(shift_items),
+            full_shifts_count=full_shifts_count,
+            full_shifts_hours=_minutes_to_hours(full_shifts_minutes),
+            shifts=shift_items,
+        )
+
+        logger.info(
+            "Отчёт по сотруднику составлен, workplace_id=%s, employee_id=%s, period=%s, смен=%s, часов=%s",
+            workplace_id, employee_id, report.period,
+            report.total_shifts, report.total_hours
+        )
+
+        return report

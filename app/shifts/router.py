@@ -12,14 +12,19 @@ from app.shifts.schemas import (
     CalendarResponse, 
     ShiftsDuplicate, 
     ShiftsDuplicateResponse,
-    CalendarReportResponse
+    CalendarReportResponse,
+    EmployeeReportResponse
 )
 from app.shifts.services import ShiftServices
 
 from app.users.model import User as UserModel
 
 from app.core.database import get_db
-from app.core.security import get_owner_or_admin, get_owner_or_employees
+from app.core.security import (
+    get_owner_or_admin,
+    get_owner_or_employees,
+    get_owner_admin_or_self
+)
 from app.core.excel_report import XLSX_MEDIA_TYPE
 
 from app.exceptions import (
@@ -462,3 +467,66 @@ async def get_calendar_report_excel(
             "Content-Disposition": f'attachment; filename="{report_file.filename}"',
         },
     )
+
+
+@router.get(
+    "/reports/employee",
+    response_model=EmployeeReportResponse,
+)
+async def get_employee_report(
+    workplace_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID рабочего пространства"
+        )
+    ],
+    employee_id: Annotated[
+        int, 
+        Query(
+            ge=1, 
+            description="ID работника"
+        )
+    ],
+    month: Annotated[
+        int, 
+        Query(
+            description="Месяц отчёта (1–12)"
+        )
+    ],
+    year: Annotated[
+        int, 
+        Query(
+            description="Год отчёта (например, 2026)"
+        )
+    ],
+    db: Annotated[
+        AsyncSession, 
+        Depends(get_db)
+    ],
+    _: Annotated[
+        UserModel, 
+        Depends(get_owner_admin_or_self)
+    ]
+) -> EmployeeReportResponse:
+    """
+    Отчёт по сотруднику рабочей точки за месяц: даты отработанных смен
+    (по сегодняшний день включительно), часы, признак полной смены,
+    примечание к смене и итоги за период.
+    Владелец и администратор точки видят любого сотрудника, работник — только себя.
+    """
+    try:
+        shift_service = ShiftServices(db)
+        return await shift_service.get_employee_report(
+            workplace_id, employee_id, month, year
+        )
+    except InvalidReportPeriodException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.msg
+        )
+    except (WorkplaceNotFoundException, EmployeeNotFoundException) as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.msg
+        )
